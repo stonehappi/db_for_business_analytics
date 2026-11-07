@@ -2,26 +2,41 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Database Learning Platform & Project Management E2E', () => {
 
-  test('1. Role switcher and header indicators work correctly', async ({ page }) => {
+  test('1. Role switcher distinguishes Teacher vs Student UIs and navigation', async ({ page }) => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
-    // Header brand and cohort code
-    await expect(page.locator('text=DB Analytics')).toBeVisible();
-    await expect(page.locator('text=BA-2026-FALL-A')).toBeVisible();
-
-    // Verify user switcher
+    // 1. Verify default Student View (Sokha Chan)
     const userSwitcher = page.locator('[data-testid="user-switcher"]');
     await expect(userSwitcher).toBeVisible();
 
-    // Switch to Professor Alan Smith (Teacher)
     const options = await userSwitcher.locator('option').allInnerTexts();
-    const teacherOption = options.find((o) => o.includes('Professor Alan Smith'));
-    expect(teacherOption).toBeTruthy();
+    const studentOption = options.find((o) => o.includes('Sokha Chan'))!;
+    await userSwitcher.selectOption({ label: studentOption });
 
-    await userSwitcher.selectOption({ label: teacherOption! });
-    // Tab should automatically switch to Gradebook or stay accessible
+    // In Student View:
+    await expect(page.getByTestId('role-mode-badge')).toContainText(/student mode/i);
+    await expect(page.locator('[data-testid="tab-workspace"]')).toBeVisible();
+    await expect(page.locator('[data-testid="tab-my-grades"]')).toBeVisible();
+    // Teacher tabs must be hidden for students:
+    await expect(page.locator('[data-testid="tab-curriculum"]')).not.toBeVisible();
+
+    // Check My Grades tab displays personal scorecard
+    await page.locator('[data-testid="tab-my-grades"]').click();
+    await expect(page.locator('text=Current Weighted Score')).toBeVisible();
+    await expect(page.locator('text=Assignment Scores & Grade Contributions')).toBeVisible();
+    await expect(page.locator('text=Instructor Line-Item Feedback')).toBeVisible();
+
+    // 2. Switch to Teacher View (Professor Alan Smith)
+    const teacherOption = options.find((o) => o.includes('Professor Alan Smith'))!;
+    await userSwitcher.selectOption({ label: teacherOption });
+
+    // In Teacher View:
+    await expect(page.getByTestId('role-mode-badge')).toContainText(/teacher mode/i);
     await expect(page.locator('[data-testid="tab-gradebook"]')).toBeVisible();
+    await expect(page.locator('[data-testid="tab-curriculum"]')).toBeVisible();
+    // Student personal tab must not be shown to teacher:
+    await expect(page.locator('[data-testid="tab-my-grades"]')).not.toBeVisible();
   });
 
   test('2. Teacher can inspect 16-week master curriculum and publish assignment', async ({ page }) => {

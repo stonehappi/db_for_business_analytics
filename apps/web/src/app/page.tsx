@@ -3,13 +3,14 @@
 import React, { useState, useEffect } from 'react';
 import Navigation, { UserProfile } from '@/components/Navigation';
 import StudentWorkspace from '@/components/StudentWorkspace';
+import StudentGradesView from '@/components/StudentGradesView';
 import GradebookMatrix from '@/components/GradebookMatrix';
 import CurriculumView from '@/components/CurriculumView';
 
 export default function Home() {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
-  const [activeTab, setActiveTab] = useState<'workspace' | 'gradebook' | 'curriculum'>('workspace');
+  const [activeTab, setActiveTab] = useState<'workspace' | 'gradebook' | 'curriculum' | 'my-grades'>('workspace');
   const [cohortId, setCohortId] = useState<string>('a1b2c3d4-0000-1111-2222-333333333333');
   const [cohortCode, setCohortCode] = useState<string>('BA-2026-FALL-A');
   const [cohortStatus, setCohortStatus] = useState<string>('active');
@@ -21,7 +22,6 @@ export default function Home() {
       .then((data: UserProfile[]) => {
         setUsers(data);
         if (data.length > 0) {
-          // Default to student (Sokha Chan) or teacher
           const defaultUser = data.find((u) => u.role === 'student') || data[0];
           setCurrentUser(defaultUser);
         }
@@ -40,12 +40,12 @@ export default function Home() {
       .catch((err) => console.error('Error fetching cohorts:', err));
   }, []);
 
-  // When user switches, adjust default tab appropriately
+  // When user switches role, automatically select the role-appropriate default view
   const handleSelectUser = (user: UserProfile) => {
     setCurrentUser(user);
-    if (user.role === 'teacher' && activeTab === 'workspace') {
+    if ((user.role === 'teacher' || user.role === 'ta') && (activeTab === 'workspace' || activeTab === 'my-grades')) {
       setActiveTab('gradebook');
-    } else if (user.role === 'student' && activeTab !== 'workspace') {
+    } else if (user.role === 'student' && (activeTab === 'gradebook' || activeTab === 'curriculum')) {
       setActiveTab('workspace');
     }
   };
@@ -75,6 +75,9 @@ export default function Home() {
       <main className="flex-1 w-full overflow-hidden">
         {activeTab === 'workspace' && (
           <StudentWorkspace currentUser={currentUser} cohortId={cohortId} />
+        )}
+        {activeTab === 'my-grades' && (
+          <StudentGradesView currentUser={currentUser} cohortId={cohortId} />
         )}
         {activeTab === 'gradebook' && (
           <GradebookMatrix
