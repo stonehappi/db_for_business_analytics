@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  postgres-app:
+    image: postgres:16-alpine
+    container_name: db_platform_postgres_app
+    restart: unless-stopped
+    ports:
+      - "${APP_DB_PORT:-5432}:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: app_db
+    volumes:
+      - postgres_app_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d app_db"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  postgres-sandbox:
+    image: postgres:16-alpine
+    container_name: db_platform_postgres_sandbox
+    restart: unless-stopped
+    ports:
+      - "${SANDBOX_DB_PORT:-5435}:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: sandbox_db
+    volumes:
+      - postgres_sandbox_data:/var/lib/postgresql/data
+      - ./docker/sandbox-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d sandbox_db"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  postgres_app_data:
+  postgres_sandbox_data:
