@@ -67,6 +67,17 @@ services:
     image: postgres:16-alpine
     container_name: db_platform_postgres_app
     restart: always
+    # Optimized PostgreSQL runtime parameters for analytics & OLTP workloads
+    command: >
+      postgres
+      -c shared_buffers=512MB
+      -c work_mem=16MB
+      -c maintenance_work_mem=64MB
+      -c checkpoint_completion_target=0.9
+      -c wal_buffers=16MB
+      -c default_statistics_target=100
+      -c random_page_cost=1.1
+      -c effective_io_concurrency=200
     # Bound to loopback interface only for local maintenance/backups (NEVER 0.0.0.0)
     ports:
       - "127.0.0.1:${APP_DB_PORT:-5432}:5432"
@@ -99,6 +110,14 @@ services:
     image: postgres:16-alpine
     container_name: db_platform_postgres_sandbox
     restart: always
+    # Enforce database daemon-level hard limits on student execution sandbox
+    command: >
+      postgres
+      -c statement_timeout=3000
+      -c lock_timeout=2000
+      -c idle_in_transaction_session_timeout=5000
+      -c work_mem=16MB
+      -c temp_file_limit=50MB
     # Bound to loopback interface only for local maintenance (NEVER 0.0.0.0)
     ports:
       - "127.0.0.1:${SANDBOX_DB_PORT:-5435}:5432"

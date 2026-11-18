@@ -19,3 +19,17 @@ echo "[Backup] Backup completed successfully: ${BACKUP_FILE} ($(du -h "$BACKUP_F
 # Keep last 30 days of backups (prune older)
 find "$BACKUP_DIR" -name "backup_${DB_NAME}_*.sql.gz" -mtime +30 -delete 2>/dev/null || true
 echo "[Backup] Retention policy applied (pruned backups older than 30 days)."
+
+# Optional: Upload to S3 / Cloudflare R2 if S3_BUCKET is configured
+if [ -n "$S3_BUCKET" ]; then
+  echo "[Backup] Syncing ${BACKUP_FILE} to s3://${S3_BUCKET}..."
+  if command -v aws >/dev/null 2>&1; then
+    aws s3 cp "$BACKUP_FILE" "s3://${S3_BUCKET}/$(basename "$BACKUP_FILE")"
+    echo "[Backup] Remote S3 sync complete."
+  elif command -v rclone >/dev/null 2>&1; then
+    rclone copy "$BACKUP_FILE" "remote:${S3_BUCKET}/"
+    echo "[Backup] Remote rclone sync complete."
+  else
+    echo "[Backup] Notice: S3_BUCKET set but 'aws' or 'rclone' CLI not detected on host."
+  fi
+fi
