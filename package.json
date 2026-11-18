@@ -16,5 +16,9 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.49.0"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "jose": "^6.2.17"
   }
 }

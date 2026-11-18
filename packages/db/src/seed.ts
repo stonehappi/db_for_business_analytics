@@ -1,4 +1,5 @@
 import { appPool, sandboxAdminPool } from './client';
+import bcrypt from 'bcryptjs';
 
 export async function runSeed() {
   console.log('[SEED] Starting seed script...');
@@ -9,7 +10,8 @@ export async function runSeed() {
     await client.query('BEGIN;');
 
     // 1. Seed Users
-    console.log('[SEED] Seeding users...');
+    console.log('[SEED] Seeding users with hashed passwords...');
+    const defaultPasswordHash = bcrypt.hashSync('Password123!', 10);
     const users = [
       {
         id: '00000000-0000-0000-0000-000000000001',
@@ -64,14 +66,15 @@ export async function runSeed() {
 
     for (const u of users) {
       await client.query(`
-        INSERT INTO users (id, student_id_code, email, full_name, role)
-        VALUES ($1, $2, $3, $4, $5)
+        INSERT INTO users (id, student_id_code, email, password_hash, full_name, role)
+        VALUES ($1, $2, $3, $4, $5, $6)
         ON CONFLICT (id) DO UPDATE SET
           student_id_code = EXCLUDED.student_id_code,
           email = EXCLUDED.email,
+          password_hash = EXCLUDED.password_hash,
           full_name = EXCLUDED.full_name,
           role = EXCLUDED.role;
-      `, [u.id, u.studentIdCode, u.email, u.fullName, u.role]);
+      `, [u.id, u.studentIdCode, u.email, defaultPasswordHash, u.fullName, u.role]);
     }
 
     // 2. Seed Cohort

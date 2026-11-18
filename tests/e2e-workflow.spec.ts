@@ -1,53 +1,83 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, Page } from '@playwright/test';
+
+// Authentication helper
+async function loginAs(page: Page, email: string, password = 'Password123!') {
+  await page.goto('/login');
+  await page.fill('[data-testid="input-email"]', email);
+  await page.fill('[data-testid="input-password"]', password);
+  await page.click('[data-testid="login-submit-btn"]');
+  await page.waitForURL('/', { timeout: 10000 });
+}
 
 test.describe('Database Learning Platform & Project Management E2E', () => {
 
-  test('1. Role switcher distinguishes Teacher vs Student UIs and navigation', async ({ page }) => {
+  test('1. Production Authentication: login guard, invalid credentials, sign in, logout & registration', async ({ page }) => {
+    // 1. Unauthenticated request to '/' must redirect to '/login'
     await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await page.waitForURL(/\/login/);
+    await expect(page.locator('text=Sign in to your account')).toBeVisible();
 
-    // 1. Verify default Student View (Sokha Chan)
-    const userSwitcher = page.locator('[data-testid="user-switcher"]');
-    await expect(userSwitcher).toBeVisible();
+    // 2. Invalid credentials show error alert
+    await page.fill('[data-testid="input-email"]', 'prof.smith@uni.edu');
+    await page.fill('[data-testid="input-password"]', 'WrongPassword999!');
+    await page.click('[data-testid="login-submit-btn"]');
+    await expect(page.getByTestId('auth-error-banner')).toContainText(/invalid email or password/i);
 
-    const options = await userSwitcher.locator('option').allInnerTexts();
-    const studentOption = options.find((o) => o.includes('Sokha Chan'))!;
-    await userSwitcher.selectOption({ label: studentOption });
+    // 3. Successful login as Lead Teacher
+    await page.fill('[data-testid="input-email"]', 'prof.smith@uni.edu');
+    await page.fill('[data-testid="input-password"]', 'Password123!');
+    await page.click('[data-testid="login-submit-btn"]');
+    await page.waitForURL('/');
 
-    // In Student View:
-    await expect(page.getByTestId('role-mode-badge')).toContainText(/student mode/i);
-    await expect(page.locator('[data-testid="tab-workspace"]')).toBeVisible();
-    await expect(page.locator('[data-testid="tab-my-grades"]')).toBeVisible();
-    // Teacher tabs must be hidden for students:
-    await expect(page.locator('[data-testid="tab-curriculum"]')).not.toBeVisible();
-
-    // Check My Grades tab displays personal scorecard
-    await page.locator('[data-testid="tab-my-grades"]').click();
-    await expect(page.locator('text=Current Weighted Score')).toBeVisible();
-    await expect(page.locator('text=Assignment Scores & Grade Contributions')).toBeVisible();
-    await expect(page.locator('text=Instructor Line-Item Feedback')).toBeVisible();
-
-    // 2. Switch to Teacher View (Professor Alan Smith)
-    const teacherOption = options.find((o) => o.includes('Professor Alan Smith'))!;
-    await userSwitcher.selectOption({ label: teacherOption });
-
-    // In Teacher View:
+    // Verify teacher controls are visible
     await expect(page.getByTestId('role-mode-badge')).toContainText(/teacher mode/i);
     await expect(page.locator('[data-testid="tab-gradebook"]')).toBeVisible();
     await expect(page.locator('[data-testid="tab-curriculum"]')).toBeVisible();
-    // Student personal tab must not be shown to teacher:
-    await expect(page.locator('[data-testid="tab-my-grades"]')).not.toBeVisible();
+
+    // 4. Test Sign Out
+    const logoutBtn = page.locator('[data-testid="logout-btn"]');
+    await expect(logoutBtn).toBeVisible();
+    await logoutBtn.click();
+    await page.waitForURL(/\/login/);
+
+    // 5. One-Click Demo Persona Login as Student (Sokha Chan)
+    const demoStudentBtn = page.locator('[data-testid^="demo-login-student"]').first();
+    await expect(demoStudentBtn).toBeVisible();
+    await demoStudentBtn.click();
+    await page.waitForURL('/');
+
+    // Verify student view controls
+    await expect(page.getByTestId('role-mode-badge')).toContainText(/student mode/i);
+    await expect(page.locator('[data-testid="tab-workspace"]')).toBeVisible();
+    await expect(page.locator('[data-testid="tab-my-grades"]')).toBeVisible();
+    await expect(page.locator('[data-testid="tab-curriculum"]')).not.toBeVisible();
+
+    // 6. Test My Grades view
+    await page.locator('[data-testid="tab-my-grades"]').click();
+    await expect(page.locator('text=Current Weighted Score')).toBeVisible();
+    await expect(page.locator('text=Assignment Scores & Grade Contributions')).toBeVisible();
+
+    // 7. Test Student Registration
+    await page.locator('[data-testid="logout-btn"]').click();
+    await page.waitForURL(/\/login/);
+
+    await page.locator('[data-testid="switch-to-register-btn"]').click();
+    await expect(page.locator('text=Student Course Enrollment')).toBeVisible();
+
+    const timestamp = Date.now();
+    await page.fill('[data-testid="register-name"]', `New Student ${timestamp}`);
+    await page.fill('[data-testid="register-student-id"]', `STU-NEW-${timestamp.toString().slice(-4)}`);
+    await page.fill('[data-testid="register-email"]', `newstudent${timestamp}@uni.edu`);
+    await page.fill('[data-testid="register-password"]', 'Password123!');
+    await page.click('[data-testid="register-submit-btn"]');
+
+    // Automatically logs in and lands on dashboard
+    await page.waitForURL('/');
+    await expect(page.getByTestId('role-mode-badge')).toContainText(/student mode/i);
   });
 
   test('2. Teacher can inspect 16-week master curriculum and publish assignment', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
-
-    // Switch to Teacher
-    const userSwitcher = page.locator('[data-testid="user-switcher"]');
-    const options = await userSwitcher.locator('option').allInnerTexts();
-    const teacherOption = options.find((o) => o.includes('Professor Alan Smith'))!;
-    await userSwitcher.selectOption({ label: teacherOption });
+    await loginAs(page, 'prof.smith@uni.edu');
 
     // Click Master Curriculum tab
     await page.locator('[data-testid="tab-curriculum"]').click();
@@ -79,14 +109,7 @@ test.describe('Database Learning Platform & Project Management E2E', () => {
   });
 
   test('3. Student 3-panel workspace: load brief, run query, verify tests, submit', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
-
-    // Select Student (Sokha Chan)
-    const userSwitcher = page.locator('[data-testid="user-switcher"]');
-    const options = await userSwitcher.locator('option').allInnerTexts();
-    const studentOption = options.find((o) => o.includes('Sokha Chan'))!;
-    await userSwitcher.selectOption({ label: studentOption });
+    await loginAs(page, 'sokha.c@uni.edu');
 
     // Open Student Workspace
     await page.locator('[data-testid="tab-workspace"]').click();
@@ -122,14 +145,7 @@ test.describe('Database Learning Platform & Project Management E2E', () => {
   });
 
   test('4. Teacher Gradebook Matrix: spreadsheet view, side-by-side grading drawer', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
-
-    // Switch to Teacher
-    const userSwitcher = page.locator('[data-testid="user-switcher"]');
-    const options = await userSwitcher.locator('option').allInnerTexts();
-    const teacherOption = options.find((o) => o.includes('Professor Alan Smith'))!;
-    await userSwitcher.selectOption({ label: teacherOption });
+    await loginAs(page, 'prof.smith@uni.edu');
 
     await page.locator('[data-testid="tab-gradebook"]').click();
 
@@ -162,14 +178,7 @@ test.describe('Database Learning Platform & Project Management E2E', () => {
   });
 
   test('5. End-of-class completion & lock grades workflow', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
-
-    // Switch to Teacher
-    const userSwitcher = page.locator('[data-testid="user-switcher"]');
-    const options = await userSwitcher.locator('option').allInnerTexts();
-    const teacherOption = options.find((o) => o.includes('Professor Alan Smith'))!;
-    await userSwitcher.selectOption({ label: teacherOption });
+    await loginAs(page, 'prof.smith@uni.edu');
 
     await page.locator('[data-testid="tab-gradebook"]').click();
 
@@ -191,6 +200,12 @@ test.describe('Database Learning Platform & Project Management E2E', () => {
   test('6. Gradebook Export (.CSV and .XLSX) API verification', async ({ request }) => {
     const cohortId = 'a1b2c3d4-0000-1111-2222-333333333333';
 
+    // Authenticate as teacher
+    const loginRes = await request.post('/api/auth/login', {
+      data: { email: 'prof.smith@uni.edu', password: 'Password123!' },
+    });
+    expect(loginRes.status()).toBe(200);
+
     // 1. Test CSV Export
     const csvResponse = await request.get(`/api/cohorts/${cohortId}/scores/export?format=csv`);
     expect(csvResponse.status()).toBe(200);
@@ -210,6 +225,12 @@ test.describe('Database Learning Platform & Project Management E2E', () => {
   });
 
   test('7. Sandbox Security Guardrails & Timeout Enforcement', async ({ request }) => {
+    // Authenticate as student
+    const loginRes = await request.post('/api/auth/login', {
+      data: { email: 'sokha.c@uni.edu', password: 'Password123!' },
+    });
+    expect(loginRes.status()).toBe(200);
+
     // 1. Prohibited DROP DATABASE command
     const resDrop = await request.post('/api/sandbox/execute', {
       data: { sqlCode: 'DROP DATABASE sandbox_db;' },

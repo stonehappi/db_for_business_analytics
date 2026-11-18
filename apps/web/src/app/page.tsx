@@ -15,19 +15,36 @@ export default function Home() {
   const [cohortCode, setCohortCode] = useState<string>('BA-2026-FALL-A');
   const [cohortStatus, setCohortStatus] = useState<string>('active');
 
-  // Load users and cohorts
+  // Load authenticated session, users, and cohorts
   useEffect(() => {
+    // 1. Fetch current authenticated session
+    fetch('/api/auth/me')
+      .then(async (res) => {
+        if (!res.ok) {
+          window.location.href = '/login';
+          return;
+        }
+        const data = await res.json();
+        setCurrentUser(data.user);
+        if (data.user.role === 'teacher' || data.user.role === 'ta') {
+          setActiveTab('gradebook');
+        } else {
+          setActiveTab('workspace');
+        }
+      })
+      .catch(() => {
+        window.location.href = '/login';
+      });
+
+    // 2. Fetch all users for switcher
     fetch('/api/users')
       .then((res) => res.json())
       .then((data: UserProfile[]) => {
         setUsers(data);
-        if (data.length > 0) {
-          const defaultUser = data.find((u) => u.role === 'student') || data[0];
-          setCurrentUser(defaultUser);
-        }
       })
       .catch((err) => console.error('Error fetching users:', err));
 
+    // 3. Fetch cohorts
     fetch('/api/cohorts')
       .then((res) => res.json())
       .then((data) => {
@@ -40,8 +57,16 @@ export default function Home() {
       .catch((err) => console.error('Error fetching cohorts:', err));
   }, []);
 
-  // When user switches role, automatically select the role-appropriate default view
-  const handleSelectUser = (user: UserProfile) => {
+  // When user switches role, update backend session & select role-appropriate default view
+  const handleSelectUser = async (user: UserProfile) => {
+    try {
+      await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: user.email, password: 'Password123!' }),
+      });
+    } catch {}
+
     setCurrentUser(user);
     if ((user.role === 'teacher' || user.role === 'ta') && (activeTab === 'workspace' || activeTab === 'my-grades')) {
       setActiveTab('gradebook');

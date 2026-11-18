@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Database, User, ShieldCheck, GraduationCap, BookOpen, TableProperties, Award } from 'lucide-react';
+import { Database, User, ShieldCheck, GraduationCap, BookOpen, TableProperties, Award, LogOut } from 'lucide-react';
 
 export interface UserProfile {
   id: string;
@@ -32,6 +32,14 @@ export default function Navigation({
 }: NavigationProps) {
   const isTeacherOrTa = currentUser.role === 'teacher' || currentUser.role === 'ta';
   const isStudent = currentUser.role === 'student';
+
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } finally {
+      window.location.href = '/login';
+    }
+  };
 
   return (
     <header className="h-12 border-b border-border bg-surface px-4 flex items-center justify-between select-none shrink-0">
@@ -177,6 +185,16 @@ export default function Navigation({
               </option>
             ))}
           </select>
+
+          <button
+            onClick={handleLogout}
+            data-testid="logout-btn"
+            title="Sign Out of Session"
+            className="px-2 py-1 text-xs border border-border bg-subtle hover:bg-active text-ink rounded transition-colors flex items-center space-x-1"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Sign Out</span>
+          </button>
         </div>
       </div>
     </header>
