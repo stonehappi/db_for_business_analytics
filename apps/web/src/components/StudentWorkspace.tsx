@@ -460,8 +460,11 @@ export default function StudentWorkspace({ currentUser, cohortId, courseId }: St
                 {/* Editor Action Toolbar */}
                 <div className="h-10 px-3 bg-subtle/40 border-b border-border flex items-center justify-between shrink-0">
                   <div className="flex items-center space-x-2">
-                    <span className="text-xs font-mono font-medium text-ink">
-                      solution_query.sql
+                    <span
+                      title={selectedAssignment?.slug ? `${selectedAssignment.slug}.sql` : 'query.sql'}
+                      className="text-xs font-mono font-medium text-ink truncate max-w-[120px] xs:max-w-[180px] sm:max-w-none"
+                    >
+                      {selectedAssignment?.slug ? `${selectedAssignment.slug}.sql` : 'query.sql'}
                     </span>
                     <span className="text-[10px] text-ink-secondary font-mono px-1.5 py-0.2 bg-white border border-border rounded hidden xs:inline">
                       PostgreSQL 16

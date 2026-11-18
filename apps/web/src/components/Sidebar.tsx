@@ -291,12 +291,14 @@ export default function Sidebar({
             >
               <Calendar className="w-3.5 h-3.5" />
             </div>
-            <span
+            <div
               data-testid="role-mode-badge"
-              className="text-[9px] font-mono uppercase px-1 py-0.5 rounded bg-zinc-900 text-white"
+              title={`${currentUser.role} Mode`}
+              className="w-8 h-8 rounded border border-border bg-zinc-900 text-white flex items-center justify-center text-[10px] font-mono font-semibold uppercase tracking-wider cursor-default"
             >
-              {currentUser.role.slice(0, 3)} Mode
-            </span>
+              {currentUser.role.slice(0, 3)}
+              <span className="sr-only"> Mode</span>
+            </div>
           </div>
         )}
 

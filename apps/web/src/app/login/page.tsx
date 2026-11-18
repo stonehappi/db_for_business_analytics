@@ -10,6 +10,11 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
 
   // Quick Demo Accounts
   const demoAccounts = [
@@ -19,13 +24,21 @@ export default function LoginPage() {
     { label: 'Student B', name: 'Dara Vong (STU-002)', email: 'dara.v@uni.edu', role: 'student' },
   ];
 
-  const handleLogin = async (e?: React.FormEvent, customEmail?: string, customPassword?: string) => {
+  const handleLogin = async (e?: React.FormEvent<HTMLFormElement>, customEmail?: string, customPassword?: string) => {
     if (e) e.preventDefault();
     setError(null);
     setIsLoading(true);
 
-    const loginEmail = customEmail || email;
-    const loginPassword = customPassword || password;
+    let loginEmail = customEmail || email;
+    let loginPassword = customPassword || password;
+
+    if (e && e.currentTarget) {
+      const formData = new FormData(e.currentTarget);
+      const formEmail = formData.get('email') as string;
+      const formPassword = formData.get('password') as string;
+      if (formEmail) loginEmail = formEmail;
+      if (formPassword) loginPassword = formPassword;
+    }
 
     try {
       const res = await fetch('/api/auth/login', {
@@ -91,13 +104,14 @@ export default function LoginPage() {
           )}
 
           {/* Login Form */}
-          <form onSubmit={handleLogin} className="space-y-4">
+          <form onSubmit={handleLogin} data-hydrated={hydrated} className="space-y-4">
             <div>
               <label className="block text-xs font-medium text-ink mb-1">
                 Email Address
               </label>
               <input
                 type="email"
+                name="email"
                 required
                 data-testid="input-email"
                 value={email}
@@ -118,6 +132,7 @@ export default function LoginPage() {
               </div>
               <input
                 type="password"
+                name="password"
                 required
                 data-testid="input-password"
                 value={password}

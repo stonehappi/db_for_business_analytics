@@ -1,0 +1,133 @@
+version: '3.8'
+
+services:
+  # ----------------------------------------------------------------------------
+  # Automated TLS / SSL Reverse Proxy (Caddy)
+  # ----------------------------------------------------------------------------
+  caddy:
+    image: caddy:2-alpine
+    container_name: db_platform_caddy
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - APP_DOMAIN=${APP_DOMAIN:-localhost}
+    volumes:
+      - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    depends_on:
+      - web
+
+  # ----------------------------------------------------------------------------
+  # Next.js Application Server (Standalone Production Image)
+  # ----------------------------------------------------------------------------
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: db_platform_web:latest
+    container_name: db_platform_web
+    restart: always
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DATABASE_URL=postgresql://${POSTGRES_APP_USER:-postgres}:${POSTGRES_APP_PASSWORD}@postgres-app:5432/${POSTGRES_APP_DB:-app_db}
+      - SANDBOX_ADMIN_DATABASE_URL=postgresql://${POSTGRES_SANDBOX_USER:-postgres}:${POSTGRES_SANDBOX_PASSWORD}@postgres-sandbox:5432/${POSTGRES_SANDBOX_DB:-sandbox_db}
+      - SANDBOX_STUDENT_DATABASE_URL=postgresql://${STUDENT_SANDBOX_USER:-student_sandbox_user}:${STUDENT_SANDBOX_PASSWORD:-sandbox_safe_pw}@postgres-sandbox:5432/${POSTGRES_SANDBOX_DB:-sandbox_db}
+      - JWT_SECRET=${JWT_SECRET:?Error: JWT_SECRET environment variable is required in production}
+      - AUTO_MIGRATE=${AUTO_MIGRATE:-true}
+      - AUTO_SEED=${AUTO_SEED:-false}
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2048M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+    depends_on:
+      postgres-app:
+        condition: service_healthy
+      postgres-sandbox:
+        condition: service_healthy
+
+  # ----------------------------------------------------------------------------
+  # Application Database (Primary OLTP)
+  # ----------------------------------------------------------------------------
+  postgres-app:
+    image: postgres:16-alpine
+    container_name: db_platform_postgres_app
+    restart: always
+    # Bound to loopback interface only for local maintenance/backups (NEVER 0.0.0.0)
+    ports:
+      - "127.0.0.1:${APP_DB_PORT:-5432}:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_APP_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_APP_PASSWORD:?Error: POSTGRES_APP_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_APP_DB:-app_db}
+    volumes:
+      - postgres_app_data:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2048M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ----------------------------------------------------------------------------
+  # Sandbox Database (Student Query Execution & Verification)
+  # ----------------------------------------------------------------------------
+  postgres-sandbox:
+    image: postgres:16-alpine
+    container_name: db_platform_postgres_sandbox
+    restart: always
+    # Bound to loopback interface only for local maintenance (NEVER 0.0.0.0)
+    ports:
+      - "127.0.0.1:${SANDBOX_DB_PORT:-5435}:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_SANDBOX_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_SANDBOX_PASSWORD:?Error: POSTGRES_SANDBOX_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_SANDBOX_DB:-sandbox_db}
+      STUDENT_SANDBOX_PASSWORD: ${STUDENT_SANDBOX_PASSWORD:-sandbox_safe_pw}
+    volumes:
+      - postgres_sandbox_data:/var/lib/postgresql/data
+      - ./docker/init-sandbox.sh:/docker-entrypoint-initdb.d/init-sandbox.sh:ro
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1024M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_app_data:
+  postgres_sandbox_data:
+  caddy_data:
+  caddy_config:

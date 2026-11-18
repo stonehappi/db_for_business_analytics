@@ -3,6 +3,7 @@ import { test, expect, Page } from '@playwright/test';
 // Authentication helper
 async function loginAs(page: Page, email: string, password = 'Password123!') {
   await page.goto('/login');
+  await expect(page.locator('form[data-hydrated="true"]')).toBeVisible({ timeout: 10000 });
   await page.fill('[data-testid="input-email"]', email);
   await page.fill('[data-testid="input-password"]', password);
   await page.click('[data-testid="login-submit-btn"]');
@@ -16,6 +17,7 @@ test.describe('Database Learning Platform & Project Management E2E', () => {
     await page.goto('/');
     await page.waitForURL(/\/login/);
     await expect(page.locator('text=Sign in to your account')).toBeVisible();
+    await expect(page.locator('form[data-hydrated="true"]')).toBeVisible({ timeout: 10000 });
 
     // 2. Invalid credentials show error alert
     await page.fill('[data-testid="input-email"]', 'prof.smith@uni.edu');
