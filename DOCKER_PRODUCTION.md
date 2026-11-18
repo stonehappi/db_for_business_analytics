@@ -100,7 +100,23 @@ chmod +x ./docker/setup-cron.sh
 ## 2. Operational Playbook
 
 ### Backing Up the Application Database
-Run the provided backup script to generate a timestamped, gzip-compressed snapshot:
+
+#### Option A: In-Container Automated Backups (Built-in & Zero Config)
+The production stack includes a dedicated `backup` container service that runs automatically inside Docker.
+* **Schedule**: Automatically runs daily at 02:00 AM (configured via `BACKUP_CRON_SCHEDULE`).
+* **Target**: Saves timestamped, compressed dumps to `./backups` on the host.
+* **Retention**: Automatically prunes dumps older than 30 days (`BACKUP_RETENTION_DAYS`).
+* **Trigger Manual Backup Anytime**:
+  ```bash
+  docker compose exec backup backup-service.sh
+  ```
+* **View Backup Logs**:
+  ```bash
+  docker logs -f db_platform_backup
+  ```
+
+#### Option B: Host-Level Backup Script
+Run the provided host backup script manually whenever desired:
 ```bash
 chmod +x ./docker/backup.sh
 ./docker/backup.sh

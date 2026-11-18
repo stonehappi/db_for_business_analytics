@@ -154,6 +154,50 @@ services:
       timeout: 5s
       retries: 5
 
+  # ----------------------------------------------------------------------------
+  # In-Container Automated Database Backup Service
+  # ----------------------------------------------------------------------------
+  # Automatically dumps app_db and sandbox_db inside Docker without host cron.
+  # Backups are stored in ./backups on the host with 30-day auto-retention.
+  # ----------------------------------------------------------------------------
+  backup:
+    image: postgres:16-alpine
+    container_name: db_platform_backup
+    restart: always
+    environment:
+      POSTGRES_APP_HOST: postgres-app
+      POSTGRES_APP_PORT: 5432
+      POSTGRES_APP_USER: ${POSTGRES_APP_USER:-postgres}
+      POSTGRES_APP_PASSWORD: ${POSTGRES_APP_PASSWORD}
+      POSTGRES_APP_DB: ${POSTGRES_APP_DB:-app_db}
+      POSTGRES_SANDBOX_HOST: postgres-sandbox
+      POSTGRES_SANDBOX_PORT: 5432
+      POSTGRES_SANDBOX_USER: ${POSTGRES_SANDBOX_USER:-postgres}
+      POSTGRES_SANDBOX_PASSWORD: ${POSTGRES_SANDBOX_PASSWORD}
+      POSTGRES_SANDBOX_DB: ${POSTGRES_SANDBOX_DB:-sandbox_db}
+      BACKUP_CRON_SCHEDULE: ${BACKUP_CRON_SCHEDULE:-0 2 * * *}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
+    volumes:
+      - ./backups:/backups
+      - ./docker/backup-service.sh:/usr/local/bin/backup-service.sh:ro
+      - ./docker/backup-entrypoint.sh:/usr/local/bin/backup-entrypoint.sh:ro
+    entrypoint: ["/bin/sh", "/usr/local/bin/backup-entrypoint.sh"]
+    depends_on:
+      postgres-app:
+        condition: service_healthy
+      postgres-sandbox:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
 volumes:
   postgres_app_data:
   postgres_sandbox_data:

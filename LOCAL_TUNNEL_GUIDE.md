@@ -208,20 +208,21 @@ Because all services in `docker-compose.prod.yml` and `docker-compose.tunnel.yml
 
 ---
 
-## 4. Automated Backups & Maintenance on Linux
+## 4. Automated Backups & Maintenance
 
-Everything is fully automated using standard Linux tools:
+### 1. In-Container Backups (Automatic & Zero Setup)
+The Docker stack includes an automated `backup` container service that starts with your application:
+* **Automatic**: Runs daily at 02:00 AM inside Docker with zero host crontab configuration needed.
+* **Storage**: Dumps are saved directly to `./backups` on your Linux machine with 30-day auto-retention.
+* **Manual Backup**: Trigger anytime with `docker compose exec backup backup-service.sh`.
+* **View Logs**: Monitor with `docker logs -f db_platform_backup`.
 
-### Install Nightly Backups & Weekly Docker Pruning
-Run the included cron installer:
+### 2. Optional: Host-Level Weekly Docker Pruning
+To prevent old Docker image layers and build cache from accumulating on your Linux disk, install the weekly cleanup cron:
 ```bash
 chmod +x ./docker/*.sh
 ./docker/setup-cron.sh
 ```
-
-This schedules:
-* **Nightly at 02:00 AM**: `docker/backup.sh` creates timestamped gzip dumps of `app_db` and `sandbox_db` in `/var/backups/db-platform` with 30-day automatic retention.
-* **Weekly at 03:00 AM (Sunday)**: `docker/prune.sh` cleans stale Docker containers, dangling images, and build caches to prevent local disk exhaustion.
 
 ### Optional: Offsite Backup to AWS S3 or Cloudflare R2
 If you set `S3_BUCKET` in `.env.production`:
