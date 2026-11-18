@@ -546,7 +546,7 @@ test.describe('Database Learning Platform & Project Management E2E', () => {
     // 3. Add Student Manually
     const timestamp = Date.now();
     const newStudentEmail = `test.student.${timestamp}@uni.edu`;
-    const newStudentCode = `STU-T-${timestamp.toString().slice(-4)}`;
+    const newStudentCode = `STU-${timestamp.toString().slice(-6)}-${Math.floor(Math.random() * 1000)}`;
 
     await modal.locator('[data-testid="tab-add-student"]').click();
     await expect(modal.locator('[data-testid="form-add-student"]')).toBeVisible();
