@@ -20,11 +20,16 @@ echo "[Backup] Backup completed successfully: ${BACKUP_FILE} ($(du -h "$BACKUP_F
 find "$BACKUP_DIR" -name "backup_${DB_NAME}_*.sql.gz" -mtime +30 -delete 2>/dev/null || true
 echo "[Backup] Retention policy applied (pruned backups older than 30 days)."
 
-# Optional: Upload to S3 / Cloudflare R2 if S3_BUCKET is configured
+# Optional: Upload to S3 / Cloudflare R2 / MinIO if S3_BUCKET is configured
 if [ -n "$S3_BUCKET" ]; then
   echo "[Backup] Syncing ${BACKUP_FILE} to s3://${S3_BUCKET}..."
+  ENDPOINT_FLAG=""
+  if [ -n "$S3_ENDPOINT_URL" ]; then
+    ENDPOINT_FLAG="--endpoint-url ${S3_ENDPOINT_URL}"
+  fi
+
   if command -v aws >/dev/null 2>&1; then
-    aws s3 cp "$BACKUP_FILE" "s3://${S3_BUCKET}/$(basename "$BACKUP_FILE")"
+    aws s3 cp "$BACKUP_FILE" "s3://${S3_BUCKET}/$(basename "$BACKUP_FILE")" ${ENDPOINT_FLAG}
     echo "[Backup] Remote S3 sync complete."
   elif command -v rclone >/dev/null 2>&1; then
     rclone copy "$BACKUP_FILE" "remote:${S3_BUCKET}/"
