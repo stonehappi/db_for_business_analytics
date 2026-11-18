@@ -1,13 +1,14 @@
 {
     admin off
+    auto_https off
 }
 
-{$APP_DOMAIN:localhost} {
+:80 {
     encode gzip zstd
 
-    # Production HTTP security headers
+    # HTTP security headers (HSTS removed for HTTP-only operation)
     header {
-        Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+        -Strict-Transport-Security
         X-Content-Type-Options "nosniff"
         X-Frame-Options "DENY"
         Referrer-Policy "strict-origin-when-cross-origin"

@@ -2,6 +2,8 @@ node_modules/
 .next/
 dist/
 .env.local
+.env
+.env.production
 test-results/
 playwright-report/
 *.log
@@ -9,4 +11,3 @@ playwright-report/
 .DS_Store
 Thumbs.db
 backups/
-.env.production

@@ -8,7 +8,7 @@ mkdir -p /backups /var/log
 touch "$LOG_FILE"
 
 # Export environment variables so cron subshell has access to DB passwords, hosts, and cloud keys
-printenv | grep -E '^(POSTGRES_|BACKUP_|S3_|AWS_)' > /etc/environment
+export -p | grep -E '(POSTGRES_|BACKUP_|S3_|AWS_)' > /etc/environment
 chmod 0600 /etc/environment
 
 # If S3/R2 upload is configured, ensure aws-cli is available inside the container
@@ -31,7 +31,7 @@ echo "=========================================================="
 echo "${BACKUP_CRON_SCHEDULE} /bin/sh /usr/local/bin/backup-service.sh >> ${LOG_FILE} 2>&1" > /etc/crontabs/root
 
 # Make scripts executable
-chmod +x /usr/local/bin/backup-service.sh
+chmod +x /usr/local/bin/backup-service.sh 2>/dev/null || true
 
 # Run an initial backup check to verify connectivity
 echo "[BACKUP SERVICE] Running initial backup verification..."

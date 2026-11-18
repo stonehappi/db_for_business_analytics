@@ -2,7 +2,7 @@
 # Production Docker Compose Stack
 # ==============================================================================
 # Hardened production architecture:
-# - Caddy reverse proxy: Only service exposing ports (80 and 443) with auto HTTPS
+# - Caddy reverse proxy: Only service exposing port 80 for HTTP
 # - Private network: Web, postgres-app, postgres-sandbox, and backup run privately
 # - Resource limits, JSON log rotation, PostgreSQL tuning & statement timeouts
 # - In-container automated database backups with 30-day retention & S3/R2 sync
@@ -13,7 +13,7 @@
 
 services:
   # ----------------------------------------------------------------------------
-  # Automated TLS / SSL Reverse Proxy (Caddy)
+  # Reverse Proxy (Caddy) - Port 80 HTTP Only
   # ----------------------------------------------------------------------------
   caddy:
     image: caddy:2-alpine
@@ -21,7 +21,6 @@ services:
     restart: always
     ports:
       - "80:80"
-      - "443:443"
     environment:
       - APP_DOMAIN=${APP_DOMAIN:-localhost}
     volumes:
