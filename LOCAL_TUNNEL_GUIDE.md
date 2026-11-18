@@ -94,7 +94,7 @@ First, ensure your application containers are running:
 ```bash
 docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
 ```
-*(The web container is automatically bound to `127.0.0.1:3000` on your Linux host).*
+*(Only Caddy maps ports 80/443 to the host; all databases and the Next.js server run exclusively inside the private Docker network).*
 
 ### Install `cloudflared` on Linux:
 * **Ubuntu / Debian**:

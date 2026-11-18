@@ -36,8 +36,8 @@ services:
     image: db_platform_web:latest
     container_name: db_platform_web
     restart: always
-    ports:
-      - "127.0.0.1:3000:3000"
+    expose:
+      - "3000"
     environment:
       - NODE_ENV=production
       - PORT=3000
@@ -87,9 +87,9 @@ services:
       -c default_statistics_target=100
       -c random_page_cost=1.1
       -c effective_io_concurrency=200
-    # Bound to loopback interface only for local maintenance/backups (NEVER 0.0.0.0)
-    ports:
-      - "127.0.0.1:${APP_DB_PORT:-5432}:5432"
+    # Internal private network only - zero host port exposure
+    expose:
+      - "5432"
     environment:
       POSTGRES_USER: ${POSTGRES_APP_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_APP_PASSWORD:?Error: POSTGRES_APP_PASSWORD is required}
@@ -127,9 +127,9 @@ services:
       -c idle_in_transaction_session_timeout=5000
       -c work_mem=16MB
       -c temp_file_limit=50MB
-    # Bound to loopback interface only for local maintenance (NEVER 0.0.0.0)
-    ports:
-      - "127.0.0.1:${SANDBOX_DB_PORT:-5435}:5432"
+    # Internal private network only - zero host port exposure
+    expose:
+      - "5432"
     environment:
       POSTGRES_USER: ${POSTGRES_SANDBOX_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_SANDBOX_PASSWORD:?Error: POSTGRES_SANDBOX_PASSWORD is required}
