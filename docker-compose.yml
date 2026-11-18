@@ -1,5 +1,3 @@
-version: '3.8'
-
 # ==============================================================================
 # Production Docker Compose Stack
 # ==============================================================================
@@ -57,7 +55,7 @@ services:
       - DATABASE_URL=postgresql://${POSTGRES_APP_USER:-postgres}:${POSTGRES_APP_PASSWORD}@postgres-app:5432/${POSTGRES_APP_DB:-app_db}
       - SANDBOX_ADMIN_DATABASE_URL=postgresql://${POSTGRES_SANDBOX_USER:-postgres}:${POSTGRES_SANDBOX_PASSWORD}@postgres-sandbox:5432/${POSTGRES_SANDBOX_DB:-sandbox_db}
       - SANDBOX_STUDENT_DATABASE_URL=postgresql://${STUDENT_SANDBOX_USER:-student_sandbox_user}:${STUDENT_SANDBOX_PASSWORD:-sandbox_safe_pw}@postgres-sandbox:5432/${POSTGRES_SANDBOX_DB:-sandbox_db}
-      - JWT_SECRET=${JWT_SECRET:?Error: JWT_SECRET environment variable is required in production}
+      - JWT_SECRET=${JWT_SECRET}
       - AUTO_MIGRATE=${AUTO_MIGRATE:-true}
       - AUTO_SEED=${AUTO_SEED:-false}
     healthcheck:
@@ -105,7 +103,7 @@ services:
       - "5432"
     environment:
       POSTGRES_USER: ${POSTGRES_APP_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_APP_PASSWORD:?Error: POSTGRES_APP_PASSWORD is required}
+      POSTGRES_PASSWORD: ${POSTGRES_APP_PASSWORD}
       POSTGRES_DB: ${POSTGRES_APP_DB:-app_db}
     volumes:
       - postgres_app_data:/var/lib/postgresql/data
@@ -145,7 +143,7 @@ services:
       - "5432"
     environment:
       POSTGRES_USER: ${POSTGRES_SANDBOX_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_SANDBOX_PASSWORD:?Error: POSTGRES_SANDBOX_PASSWORD is required}
+      POSTGRES_PASSWORD: ${POSTGRES_SANDBOX_PASSWORD}
       POSTGRES_DB: ${POSTGRES_SANDBOX_DB:-sandbox_db}
       STUDENT_SANDBOX_PASSWORD: ${STUDENT_SANDBOX_PASSWORD:-sandbox_safe_pw}
     volumes:
