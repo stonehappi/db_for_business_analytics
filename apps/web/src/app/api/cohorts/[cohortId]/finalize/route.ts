@@ -5,6 +5,14 @@ export async function POST(
   req: NextRequest,
   { params }: { params: { cohortId: string } }
 ) {
+  const sessionRole = req.headers.get('x-user-role');
+  if (sessionRole === 'student') {
+    return NextResponse.json(
+      { error: 'Forbidden: Students cannot finalize cohorts or lock grades' },
+      { status: 403 }
+    );
+  }
+
   const client = await appPool.connect();
   try {
     const { cohortId } = params;

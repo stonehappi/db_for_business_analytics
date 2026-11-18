@@ -10,7 +10,18 @@ export async function PATCH(
     const body = await req.json();
     const { finalScore, teacherFeedback, status = 'graded', graderId } = body;
 
-    const effectiveGraderId = graderId || '00000000-0000-0000-0000-000000000001';
+    const sessionUserId = req.headers.get('x-user-id');
+    const sessionRole = req.headers.get('x-user-role');
+
+    // Role-based authorization: students are strictly prohibited from grading
+    if (sessionRole === 'student') {
+      return NextResponse.json(
+        { error: 'Forbidden: Students cannot grade or alter submissions' },
+        { status: 403 }
+      );
+    }
+
+    const effectiveGraderId = sessionUserId || graderId || '00000000-0000-0000-0000-000000000001';
 
     const res = await queryApp(
       `

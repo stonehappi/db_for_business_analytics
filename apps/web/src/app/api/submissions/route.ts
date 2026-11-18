@@ -14,8 +14,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Default studentId if not provided (e.g. from session or demo default)
-    const effectiveStudentId = studentId || '00000000-0000-0000-0000-000000000011';
+    // Secure student identity resolution:
+    // Prevent identity spoofing: authenticated students can strictly only submit for themselves
+    const sessionUserId = req.headers.get('x-user-id');
+    const sessionRole = req.headers.get('x-user-role');
+
+    let effectiveStudentId = studentId || sessionUserId || '00000000-0000-0000-0000-000000000011';
+    if (sessionRole === 'student' && sessionUserId) {
+      effectiveStudentId = sessionUserId;
+    }
 
     // 1. Fetch assignment verification SQL
     const assignRes = await queryApp(

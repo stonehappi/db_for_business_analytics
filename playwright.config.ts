@@ -19,7 +19,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'npx next start apps/web -p 3000',
+    command: 'node apps/web/.next/standalone/apps/web/server.js',
     url: 'http://localhost:3000',
     reuseExistingServer: true,
     timeout: 60000,

@@ -260,6 +260,21 @@ test.describe('Database Learning Platform & Project Management E2E', () => {
     const dataTimeout = await resTimeout.json();
     expect(dataTimeout.status).toBe('timeout_error');
     expect(dataTimeout.error).toContain('statement timeout limit');
+
+    // 4. Multi-statement injection attempt blocked
+    const resMulti = await request.post('/api/sandbox/execute', {
+      data: { sqlCode: 'SELECT 1; COMMIT;' },
+    });
+    const dataMulti = await resMulti.json();
+    expect(dataMulti.status).toBe('security_violation');
+
+    // 5. RBAC Protection: Authenticated student cannot grade or alter submissions
+    const resForbiddenGrade = await request.patch('/api/submissions/00000000-0000-0000-0000-000000000099/grade', {
+      data: { finalScore: 100, teacherFeedback: 'Hacked grade' },
+    });
+    expect(resForbiddenGrade.status()).toBe(403);
+    const dataForbidden = await resForbiddenGrade.json();
+    expect(dataForbidden.error).toContain('Forbidden');
   });
 
   test('8. Multi-Course & Multi-Semester Class Management: Teacher creates Master Course, creates semester class sections, and switches between courses and classes', async ({ page }) => {

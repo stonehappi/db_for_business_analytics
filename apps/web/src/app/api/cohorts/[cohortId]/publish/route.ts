@@ -6,6 +6,14 @@ export async function POST(
   { params }: { params: { cohortId: string } }
 ) {
   try {
+    const sessionRole = req.headers.get('x-user-role');
+    if (sessionRole === 'student') {
+      return NextResponse.json(
+        { error: 'Forbidden: Students cannot publish or alter cohort assignments' },
+        { status: 403 }
+      );
+    }
+
     const { cohortId } = params;
     const body = await req.json();
     const { masterAssignmentId, dueAt, weightOverride, isPublished = true } = body;

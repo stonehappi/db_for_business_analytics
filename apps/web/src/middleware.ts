@@ -32,8 +32,14 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // Check auth token for all other routes
-  const token = req.cookies.get(AUTH_COOKIE_NAME)?.value;
+  // Check auth token for all other routes (cookie or Authorization header)
+  let token = req.cookies.get(AUTH_COOKIE_NAME)?.value;
+  if (!token) {
+    const authHeader = req.headers.get('authorization');
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7);
+    }
+  }
 
   if (!token) {
     if (pathname.startsWith('/api/')) {
@@ -46,10 +52,24 @@ export async function middleware(req: NextRequest) {
 
   try {
     const { payload } = await jwtVerify(token, JWT_SECRET);
-    const response = NextResponse.next();
-    // Forward user identity headers for downstream routes
-    response.headers.set('x-user-id', String(payload.sub));
-    response.headers.set('x-user-role', String(payload.role));
+    
+    // Forward user identity headers to downstream route handlers and server components
+    const requestHeaders = new Headers(req.headers);
+    requestHeaders.set('x-user-id', String(payload.sub));
+    requestHeaders.set('x-user-role', String(payload.role));
+    if (payload.email) requestHeaders.set('x-user-email', String(payload.email));
+
+    const response = NextResponse.next({
+      request: {
+        headers: requestHeaders,
+      },
+    });
+
+    // Enforce production security headers
+    response.headers.set('X-Content-Type-Options', 'nosniff');
+    response.headers.set('X-Frame-Options', 'DENY');
+    response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+
     return response;
   } catch {
     if (pathname.startsWith('/api/')) {

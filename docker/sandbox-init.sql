@@ -10,10 +10,15 @@ BEGIN
 END
 $$;
 
--- Grant usage on public schema
+-- Enforce default transaction read-only on the unprivileged student role
+ALTER ROLE student_sandbox_user SET default_transaction_read_only = on;
+
+-- Revoke dangerous permissions on database and public schema
+REVOKE ALL ON DATABASE sandbox_db FROM student_sandbox_user;
+REVOKE CREATE ON SCHEMA public FROM student_sandbox_user;
+
+-- Grant connect and strictly read-only SELECT permissions
+GRANT CONNECT ON DATABASE sandbox_db TO student_sandbox_user;
 GRANT USAGE ON SCHEMA public TO student_sandbox_user;
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO student_sandbox_user;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO student_sandbox_user;
-
--- Allow student_sandbox_user to create temporary tables/schemas if needed for DDL assignments
-GRANT CREATE ON DATABASE sandbox_db TO student_sandbox_user;

@@ -4,9 +4,14 @@ import { queryApp } from '@db-platform/db';
 
 export const AUTH_COOKIE_NAME = 'auth_token';
 
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || 'antigravity-secure-jwt-secret-key-production-2026-business-analytics'
-);
+const secretKey = process.env.JWT_SECRET || 'antigravity-secure-jwt-secret-key-production-2026-business-analytics';
+if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
+  console.warn(
+    '[SECURITY WARNING] JWT_SECRET is not set in production environment! Using fallback key. Set JWT_SECRET immediately.'
+  );
+}
+
+const JWT_SECRET = new TextEncoder().encode(secretKey);
 
 export interface AuthTokenPayload {
   sub: string; // user id

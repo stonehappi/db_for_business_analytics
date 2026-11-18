@@ -26,6 +26,12 @@ const PROHIBITED_PATTERNS = [
   /\bpg_cancel_backend\b/i,
   /\bpg_read_file\b/i,
   /\bpg_write_file\b/i,
+  /\bpg_ls_dir\b/i,
+  /\bpg_stat_file\b/i,
+  /\blo_export\b/i,
+  /\blo_import\b/i,
+  /\blo_unlink\b/i,
+  /\bdblink\b/i,
   /\bpg_sleep\b/i,
   /\bGRANT\b/i,
   /\bREVOKE\b/i,
@@ -34,7 +40,29 @@ const PROHIBITED_PATTERNS = [
   /\bDROP\s+ROLE\b/i,
   /\bCREATE\s+DATABASE\b/i,
   /\bSHUTDOWN\b/i,
+  /\bCOMMIT\b/i,
+  /\bROLLBACK\b/i,
+  /\bSTART\s+TRANSACTION\b/i,
+  /\bSET\s+TRANSACTION\b/i,
+  /\bDISCARD\b/i,
+  /\bVACUUM\b/i,
+  /\bTRUNCATE\b/i,
 ];
+
+// Helper to strip comments and string literals for accurate security analysis
+function sanitizeSqlForCheck(sql: string): string {
+  return sql
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/--.*$/gm, ' ')
+    .replace(/(\$[a-zA-Z0-9_]*\$)[\s\S]*?\1/g, " '' ")
+    .replace(/'(?:''|[^'])*'/g, " '' ");
+}
+
+export function hasMultipleStatements(sql: string): boolean {
+  const stripped = sanitizeSqlForCheck(sql).trim();
+  const withoutTrailing = stripped.replace(/;+\s*$/, '');
+  return withoutTrailing.includes(';');
+}
 
 export interface ColumnMeta {
   name: string;
@@ -94,8 +122,10 @@ export async function executeSandboxQuery(
   const startTime = performance.now();
 
   // 1. Pre-execution sanitization check
+  const sanitizedForCheck = sanitizeSqlForCheck(sqlCode);
+
   for (const pattern of PROHIBITED_PATTERNS) {
-    if (pattern.test(sqlCode)) {
+    if (pattern.test(sanitizedForCheck)) {
       const execTime = Math.round((performance.now() - startTime) * 10) / 10;
       return {
         status: 'security_violation',
@@ -105,8 +135,18 @@ export async function executeSandboxQuery(
     }
   }
 
-  // Strip trailing semicolons to prevent compound commands injection
-  const trimmedSql = sqlCode.trim();
+  // Multi-statement injection guard: disallow chained commands
+  if (hasMultipleStatements(sqlCode)) {
+    const execTime = Math.round((performance.now() - startTime) * 10) / 10;
+    return {
+      status: 'security_violation',
+      error: 'Security violation: Multiple SQL statements are not permitted in a single submission.',
+      executionTimeMs: execTime,
+    };
+  }
+
+  // Strip trailing semicolons for single clean query execution
+  const trimmedSql = sqlCode.trim().replace(/;+\s*$/, '');
 
   let client: PoolClient | null = null;
   try {
