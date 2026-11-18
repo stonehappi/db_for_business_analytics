@@ -10,12 +10,12 @@ This guide details how to build, deploy, secure, and operate the platform in a p
 ```mermaid
 flowchart TD
     Client["Browser (Students & Faculty)"]
-    Caddy["Caddy Reverse Proxy (Port 80/443)<br/>Automated Let's Encrypt SSL & Security Headers"]
+    Caddy["Caddy Reverse Proxy (Port 80 or PORT/APP_PORT)<br/>Reverse Proxy & Security Headers"]
     Web["Next.js Application Container (Port 3000)<br/>db_platform_web (node apps/web/server.js)"]
     PostgresApp[("Postgres App DB (app_db)<br/>Primary Relational Store")]
     PostgresSandbox[("Postgres Sandbox DB (sandbox_db)<br/>Isolated Student SQL Execution")]
 
-    Client -->|HTTPS| Caddy
+    Client -->|HTTP| Caddy
     Caddy -->|Internal Network| Web
     Web -->|Internal Network| PostgresApp
     Web -->|Internal Network| PostgresSandbox
@@ -159,7 +159,7 @@ Point your monitoring service (UptimeRobot, BetterStack, Datadog) to:
 | **Sandbox Isolation** | `student_sandbox_user` set to `default_transaction_read_only = on` | [init-sandbox.sh](docker/init-sandbox.sh) |
 | **SQL Guardrails** | Multi-statement disallowal & transaction breakout prevention | [runner.ts](packages/sandbox/runner.ts) |
 | **Network Isolation** | Web & DB containers run on private network (zero host ports) | [docker-compose.yml](docker-compose.yml) |
-| **Reverse Proxy** | Caddy maps public ports 80/443 with automated TLS | [Caddyfile](docker/Caddyfile) |
+| **Reverse Proxy** | Caddy maps public HTTP port (default 80 or PORT/APP_PORT) | [Caddyfile](docker/Caddyfile) |
 | **Migration Safety** | PostgreSQL advisory transaction locks prevent replica races | [migrate.ts](packages/db/src/migrate.ts) |
 | **TLS Encryption** | Automated Let's Encrypt TLS with HSTS and security headers | [Caddyfile](docker/Caddyfile) |
 | **Health Monitoring** | Deep `/api/health` endpoint verifies DB connectivity | [api/health](apps/web/src/app/api/health/route.ts) |
