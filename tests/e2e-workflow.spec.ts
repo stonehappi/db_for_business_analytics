@@ -3,6 +3,7 @@ import { test, expect, Page } from '@playwright/test';
 // Authentication helper
 async function loginAs(page: Page, email: string, password = 'Password123!') {
   await page.goto('/login');
+  await page.waitForSelector('form[data-hydrated="true"]', { timeout: 10000 });
   await page.fill('[data-testid="input-email"]', email);
   await page.fill('[data-testid="input-password"]', password);
   await page.click('[data-testid="login-submit-btn"]');
@@ -17,6 +18,7 @@ test.describe('Database Learning Platform & Project Management E2E', () => {
     await page.waitForURL(/\/login/);
     await page.waitForLoadState('networkidle');
     await expect(page.locator('text=Sign in to your account')).toBeVisible();
+    await page.waitForSelector('form[data-hydrated="true"]', { timeout: 10000 });
 
     // 2. Invalid credentials show error alert
     await page.fill('[data-testid="input-email"]', 'prof.smith@uni.edu');
@@ -43,11 +45,15 @@ test.describe('Database Learning Platform & Project Management E2E', () => {
     await expect(confirmLogout).toBeVisible();
     await confirmLogout.click();
     await page.waitForURL(/\/login/);
+    await page.waitForSelector('form[data-hydrated="true"]', { timeout: 10000 });
 
-    // 5. One-Click Demo Persona Login as Student (Sokha Chan)
-    const demoStudentBtn = page.locator('[data-testid^="demo-login-student"]').first();
-    await expect(demoStudentBtn).toBeVisible();
-    await demoStudentBtn.click();
+    // 5. Verify demo personas are completely removed for production
+    await expect(page.locator('[data-testid^="demo-login-"]')).toHaveCount(0);
+
+    // Sign in as Student (Sokha Chan) via standard credentials
+    await page.fill('[data-testid="input-email"]', 'sokha.c@uni.edu');
+    await page.fill('[data-testid="input-password"]', 'Password123!');
+    await page.click('[data-testid="login-submit-btn"]');
     await page.waitForURL('/');
 
     // Verify student view controls
@@ -613,6 +619,7 @@ test.describe('Database Learning Platform & Project Management E2E', () => {
     await page.goto(curriculumPath);
     await page.waitForURL(/\/login\?redirect=/);
     await expect(page.locator('text=Sign in to your account')).toBeVisible();
+    await page.waitForSelector('form[data-hydrated="true"]', { timeout: 10000 });
 
     // 2. Logging in redirects directly to the originally requested deep link
     await page.fill('[data-testid="input-email"]', 'prof.smith@uni.edu');

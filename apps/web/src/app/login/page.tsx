@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Database, ShieldCheck, ArrowRight, AlertCircle, LogIn, Lock } from 'lucide-react';
+import { Database, ShieldCheck, AlertCircle, LogIn } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -16,21 +16,13 @@ export default function LoginPage() {
     setHydrated(true);
   }, []);
 
-  // Quick Demo Accounts
-  const demoAccounts = [
-    { label: 'Lead Teacher', name: 'Prof. Alan Smith', email: 'prof.smith@uni.edu', role: 'teacher' },
-    { label: 'Teaching Assistant', name: 'Sarah Jenkins (TA)', email: 'ta.sarah@uni.edu', role: 'ta' },
-    { label: 'Student A', name: 'Sokha Chan (STU-001)', email: 'sokha.c@uni.edu', role: 'student' },
-    { label: 'Student B', name: 'Dara Vong (STU-002)', email: 'dara.v@uni.edu', role: 'student' },
-  ];
-
-  const handleLogin = async (e?: React.FormEvent<HTMLFormElement>, customEmail?: string, customPassword?: string) => {
+  const handleLogin = async (e?: React.FormEvent<HTMLFormElement>) => {
     if (e) e.preventDefault();
     setError(null);
     setIsLoading(true);
 
-    let loginEmail = customEmail || email;
-    let loginPassword = customPassword || password;
+    let loginEmail = email;
+    let loginPassword = password;
 
     if (e && e.currentTarget) {
       const formData = new FormData(e.currentTarget);
@@ -62,12 +54,6 @@ export default function LoginPage() {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleSelectDemo = (demoEmail: string) => {
-    setEmail(demoEmail);
-    setPassword('Password123!');
-    handleLogin(undefined, demoEmail, 'Password123!');
   };
 
   return (
@@ -126,9 +112,6 @@ export default function LoginPage() {
                 <label className="block text-xs font-medium text-ink">
                   Password
                 </label>
-                <span className="text-[11px] text-ink-secondary font-mono">
-                  Default: Password123!
-                </span>
               </div>
               <input
                 type="password"
@@ -164,34 +147,6 @@ export default function LoginPage() {
               <p className="text-[11px] leading-relaxed text-ink-secondary">
                 Student accounts are provisioned and managed directly by course instructors. Contact your teacher to be enrolled.
               </p>
-            </div>
-          </div>
-
-          {/* Quick Demo Accounts Selection */}
-          <div className="pt-3 border-t border-border space-y-2">
-            <span className="text-[11px] uppercase tracking-wider font-semibold text-ink-secondary block">
-              One-Click Demo Personas (Instant Access)
-            </span>
-            <div className="grid grid-cols-2 gap-2">
-              {demoAccounts.map((d, idx) => (
-                <button
-                  key={idx}
-                  type="button"
-                  data-testid={`demo-login-${d.role}-${idx}`}
-                  onClick={() => handleSelectDemo(d.email)}
-                  className="p-2 text-left bg-subtle hover:bg-active border border-border rounded transition-colors group"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-mono uppercase font-semibold text-ink-secondary group-hover:text-ink">
-                      {d.label}
-                    </span>
-                    <ArrowRight className="w-3 h-3 text-ink-secondary group-hover:text-ink transition-transform group-hover:translate-x-0.5" />
-                  </div>
-                  <div className="text-xs font-medium text-ink truncate mt-0.5">
-                    {d.name}
-                  </div>
-                </button>
-              ))}
             </div>
           </div>
         </div>
