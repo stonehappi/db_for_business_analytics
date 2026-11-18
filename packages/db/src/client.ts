@@ -16,25 +16,33 @@ const appDbUrl = process.env.DATABASE_URL || 'postgresql://postgres:postgres@loc
 const sandboxAdminUrl = process.env.SANDBOX_ADMIN_DATABASE_URL || 'postgresql://postgres:postgres@localhost:5435/sandbox_db';
 const sandboxStudentUrl = process.env.SANDBOX_STUDENT_DATABASE_URL || 'postgresql://student_sandbox_user:sandbox_safe_pw@localhost:5435/sandbox_db';
 
+const isSslEnabled = process.env.DATABASE_SSL === 'true';
+const sslConfig = isSslEnabled ? { rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false' } : undefined;
+const poolMax = parseInt(process.env.DB_POOL_MAX || '10', 10);
+const sandboxPoolMax = parseInt(process.env.SANDBOX_POOL_MAX || '15', 10);
+
 export const appPool = new Pool({
   connectionString: appDbUrl,
-  max: 20,
+  max: poolMax,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 5000,
+  ssl: sslConfig,
 });
 
 export const sandboxAdminPool = new Pool({
   connectionString: sandboxAdminUrl,
-  max: 10,
+  max: Math.min(poolMax, 10),
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 5000,
+  ssl: sslConfig,
 });
 
 export const sandboxStudentPool = new Pool({
   connectionString: sandboxStudentUrl,
-  max: 20,
+  max: sandboxPoolMax,
   idleTimeoutMillis: 10000,
   connectionTimeoutMillis: 5000,
+  ssl: sslConfig,
 });
 
 export async function queryApp<T = any>(text: string, params?: any[]): Promise<{ rows: T[]; rowCount: number }> {

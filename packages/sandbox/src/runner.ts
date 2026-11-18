@@ -10,11 +10,16 @@ const sandboxStudentUrl =
   process.env.SANDBOX_STUDENT_DATABASE_URL ||
   'postgresql://student_sandbox_user:sandbox_safe_pw@localhost:5435/sandbox_db';
 
+const isSslEnabled = process.env.DATABASE_SSL === 'true';
+const sslConfig = isSslEnabled ? { rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false' } : undefined;
+const sandboxPoolMax = parseInt(process.env.SANDBOX_POOL_MAX || '15', 10);
+
 export const sandboxPool = new Pool({
   connectionString: sandboxStudentUrl,
-  max: 20,
+  max: sandboxPoolMax,
   idleTimeoutMillis: 10000,
   connectionTimeoutMillis: 5000,
+  ssl: sslConfig,
 });
 
 // Prohibited SQL commands and functions
