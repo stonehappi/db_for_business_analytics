@@ -33,6 +33,6 @@ sudo ufw status verbose
 echo ""
 echo "=============================================================================="
 echo "Firewall configured successfully!"
-echo "NOTE: Database ports 5432 and 5435 are bound strictly to 127.0.0.1 in docker-compose.prod.yml"
-echo "and are completely shielded from external traffic."
+echo "NOTE: In docker-compose.yml, database and web ports run strictly on the private Docker network"
+echo "and only Caddy (ports 80 and 443) communicates with external traffic."
 echo "=============================================================================="

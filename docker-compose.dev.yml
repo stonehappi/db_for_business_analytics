@@ -1,0 +1,83 @@
+version: '3.8'
+
+# ==============================================================================
+# Development Docker Compose Stack
+# ==============================================================================
+# Use for local development and testing.
+# - Maps database ports to host (5432 and 5435) for direct DB client access.
+# - Uses simple development credentials.
+#
+# Usage:
+#   docker compose -f docker-compose.dev.yml up -d
+#   npm run dev  (runs Next.js web locally with hot reload on port 3000)
+# ==============================================================================
+
+services:
+  postgres-app:
+    image: postgres:16-alpine
+    container_name: db_platform_postgres_app
+    restart: unless-stopped
+    ports:
+      - "${APP_DB_PORT:-5432}:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: app_db
+    volumes:
+      - postgres_app_data_dev:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d app_db"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  postgres-sandbox:
+    image: postgres:16-alpine
+    container_name: db_platform_postgres_sandbox
+    restart: unless-stopped
+    ports:
+      - "${SANDBOX_DB_PORT:-5435}:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: sandbox_db
+    volumes:
+      - postgres_sandbox_data_dev:/var/lib/postgresql/data
+      - ./docker/sandbox-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1024M
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d sandbox_db"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: db_platform_web
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - DATABASE_URL=postgresql://postgres:postgres@postgres-app:5432/app_db
+      - SANDBOX_ADMIN_DATABASE_URL=postgresql://postgres:postgres@postgres-sandbox:5432/sandbox_db
+      - SANDBOX_STUDENT_DATABASE_URL=postgresql://student_sandbox_user:sandbox_safe_pw@postgres-sandbox:5432/sandbox_db
+      - JWT_SECRET=${JWT_SECRET:-antigravity-secure-jwt-secret-key-production-2026-business-analytics}
+      - AUTO_MIGRATE=true
+      - AUTO_SEED=true
+    depends_on:
+      postgres-app:
+        condition: service_healthy
+      postgres-sandbox:
+        condition: service_healthy
+
+volumes:
+  postgres_app_data_dev:
+  postgres_sandbox_data_dev:

@@ -64,13 +64,13 @@ Key variables to verify:
 
 ### Step 3: Build & Launch Containers
 ```bash
-docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
+docker compose --env-file .env.production up -d --build
 ```
 
 ### Step 4: Verify Deployment & Health Check
 Check running container status and health:
 ```bash
-docker compose --env-file .env.production -f docker-compose.prod.yml ps
+docker compose --env-file .env.production ps
 ```
 Verify the integrated health check endpoint (validates both databases and web server):
 ```bash
@@ -140,8 +140,8 @@ gunzip < ./backups/backup_app_db_YYYYMMDD_HHMMSS.sql.gz | docker exec -i db_plat
 ### Pulling Updates & Rebuilding (Zero Downtime)
 ```bash
 git pull origin main
-docker compose --env-file .env.production -f docker-compose.prod.yml build web
-docker compose --env-file .env.production -f docker-compose.prod.yml up -d --no-deps web
+docker compose --env-file .env.production build web
+docker compose --env-file .env.production up -d --no-deps web
 ```
 
 ### Public Uptime & External Heartbeat Monitoring
@@ -158,7 +158,8 @@ Point your monitoring service (UptimeRobot, BetterStack, Datadog) to:
 | :--- | :--- | :--- |
 | **Sandbox Isolation** | `student_sandbox_user` set to `default_transaction_read_only = on` | [init-sandbox.sh](docker/init-sandbox.sh) |
 | **SQL Guardrails** | Multi-statement disallowal & transaction breakout prevention | [runner.ts](packages/sandbox/runner.ts) |
-| **Port Exposure** | DB ports bound strictly to `127.0.0.1` (loopback only) | [docker-compose.prod.yml](docker-compose.prod.yml) |
+| **Network Isolation** | Web & DB containers run on private network (zero host ports) | [docker-compose.yml](docker-compose.yml) |
+| **Reverse Proxy** | Caddy maps public ports 80/443 with automated TLS | [Caddyfile](docker/Caddyfile) |
 | **Migration Safety** | PostgreSQL advisory transaction locks prevent replica races | [migrate.ts](packages/db/src/migrate.ts) |
 | **TLS Encryption** | Automated Let's Encrypt TLS with HSTS and security headers | [Caddyfile](docker/Caddyfile) |
 | **Health Monitoring** | Deep `/api/health` endpoint verifies DB connectivity | [api/health](apps/web/src/app/api/health/route.ts) |
