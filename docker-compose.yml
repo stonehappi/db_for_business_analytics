@@ -44,6 +44,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    pull_policy: build
     image: db_platform_web:latest
     container_name: db_platform_web
     restart: always

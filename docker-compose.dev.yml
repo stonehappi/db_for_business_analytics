@@ -57,6 +57,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    pull_policy: build
     container_name: db_platform_web
     restart: unless-stopped
     ports:
