@@ -1,6 +1,17 @@
 #!/bin/sh
 set -e
 
+# Load environment variables from .env.production if present
+if [ -f ./.env.production ]; then
+  set -a
+  . ./.env.production
+  set +a
+elif [ -f ../.env.production ]; then
+  set -a
+  . ../.env.production
+  set +a
+fi
+
 BACKUP_DIR="${BACKUP_DIR:-./backups}"
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 CONTAINER_NAME="${APP_DB_CONTAINER:-db_platform_postgres_app}"

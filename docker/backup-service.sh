@@ -46,6 +46,16 @@ find "$BACKUP_DIR" -type f -name "*.sql.gz" -mtime +"$RETENTION_DAYS" -exec rm -
 REMAINING_COUNT=$(find "$BACKUP_DIR" -type f -name "*.sql.gz" | wc -l)
 echo "      -> Total backups currently stored: ${REMAINING_COUNT}"
 
+# 4. Optional: Sync to Cloudflare R2 / AWS S3
+if [ -n "$S3_BUCKET" ] && command -v aws >/dev/null 2>&1; then
+  echo "[4/4] Syncing backups to s3://${S3_BUCKET}..."
+  ENDPOINT_FLAG=""
+  [ -n "$S3_ENDPOINT_URL" ] && ENDPOINT_FLAG="--endpoint-url ${S3_ENDPOINT_URL}"
+  aws s3 cp "$APP_FILE" "s3://${S3_BUCKET}/$(basename "$APP_FILE")" ${ENDPOINT_FLAG} || echo "[WARNING] Offsite S3 upload failed for app_db"
+  aws s3 cp "$SANDBOX_FILE" "s3://${S3_BUCKET}/$(basename "$SANDBOX_FILE")" ${ENDPOINT_FLAG} || echo "[WARNING] Offsite S3 upload failed for sandbox_db"
+  echo "      -> Offsite cloud sync completed successfully."
+fi
+
 echo "=========================================================="
 echo " Backup Completed Successfully at $(date)"
 echo "=========================================================="
