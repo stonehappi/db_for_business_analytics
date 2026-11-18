@@ -67,14 +67,32 @@ Key variables to verify:
 docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
 ```
 
-### Step 4: Verify Deployment
+### Step 4: Verify Deployment & Health Check
 Check running container status and health:
 ```bash
 docker compose --env-file .env.production -f docker-compose.prod.yml ps
 ```
-Inspect application startup logs:
+Verify the integrated health check endpoint (validates both databases and web server):
 ```bash
-docker compose --env-file .env.production -f docker-compose.prod.yml logs -f web
+curl -i http://localhost:3000/api/health
+```
+Expected output:
+```json
+{"status":"healthy","durationMs":4.2,"version":"1.0.0","checks":{"web":"ok","appDb":"ok","sandboxDb":"ok"}}
+```
+
+### Step 5: Configure Host Firewall (UFW)
+Shield the host server while keeping ports 80, 443, and SSH open:
+```bash
+chmod +x ./docker/setup-firewall.sh
+./docker/setup-firewall.sh
+```
+
+### Step 6: Install Automated Maintenance Cron Jobs
+Automatically installs the nightly database backup and weekly Docker disk prune into crontab:
+```bash
+chmod +x ./docker/setup-cron.sh
+./docker/setup-cron.sh
 ```
 
 ---
@@ -87,13 +105,15 @@ Run the provided backup script to generate a timestamped, gzip-compressed snapsh
 chmod +x ./docker/backup.sh
 ./docker/backup.sh
 ```
-Backups are saved to `./backups/backup_app_db_YYYYMMDD_HHMMSS.sql.gz` and automatically prune snapshots older than 30 days.
+* Backups are saved to `./backups/backup_app_db_YYYYMMDD_HHMMSS.sql.gz`.
+* Automatically prunes snapshots older than 30 days.
+* Set `S3_BUCKET=your-bucket-name` in `.env.production` to automatically sync backups to AWS S3 or Cloudflare R2!
 
-To set up an automated daily backup at 02:00 AM, add a crontab entry:
+### Automated Docker Disk Hygiene
+Prevents disk exhaustion from accumulated build cache and old images:
 ```bash
-crontab -e
-# Add line:
-0 2 * * * /opt/db-platform/docker/backup.sh >> /var/log/db_backup.log 2>&1
+chmod +x ./docker/prune.sh
+./docker/prune.sh
 ```
 
 ### Restoring from Backup
@@ -108,14 +128,11 @@ docker compose --env-file .env.production -f docker-compose.prod.yml build web
 docker compose --env-file .env.production -f docker-compose.prod.yml up -d --no-deps web
 ```
 
-### Viewing Logs
-```bash
-# Follow web application logs
-docker compose --env-file .env.production -f docker-compose.prod.yml logs -f web
-
-# Follow Caddy SSL & access logs
-docker compose --env-file .env.production -f docker-compose.prod.yml logs -f caddy
-```
+### Public Uptime & External Heartbeat Monitoring
+Point your monitoring service (UptimeRobot, BetterStack, Datadog) to:
+* **URL**: `https://<your-domain>/api/health`
+* **Expected Status**: `200 OK`
+* **Check Interval**: Every 60 seconds
 
 ---
 
@@ -126,7 +143,13 @@ docker compose --env-file .env.production -f docker-compose.prod.yml logs -f cad
 | **Sandbox Isolation** | `student_sandbox_user` set to `default_transaction_read_only = on` | [init-sandbox.sh](docker/init-sandbox.sh) |
 | **SQL Guardrails** | Multi-statement disallowal & transaction breakout prevention | [runner.ts](packages/sandbox/runner.ts) |
 | **Port Exposure** | DB ports bound strictly to `127.0.0.1` (loopback only) | [docker-compose.prod.yml](docker-compose.prod.yml) |
+| **Migration Safety** | PostgreSQL advisory transaction locks prevent replica races | [migrate.ts](packages/db/src/migrate.ts) |
 | **TLS Encryption** | Automated Let's Encrypt TLS with HSTS and security headers | [Caddyfile](docker/Caddyfile) |
+| **Health Monitoring** | Deep `/api/health` endpoint verifies DB connectivity | [api/health](apps/web/src/app/api/health/route.ts) |
 | **Resource Limits** | CPU and RAM limits enforced per container | `docker stats` |
+| **Log Management** | `json-file` log rotation with 20MB max-size per file | `docker inspect` |
+| **Automated Backups** | Nightly gzip database dump with optional S3 offsite sync | [backup.sh](docker/backup.sh) |
+| **Host Firewall** | UFW configured with SSH, HTTP, and HTTPS only | [setup-firewall.sh](docker/setup-firewall.sh) |
+| **Disk Hygiene** | Weekly Sunday cron purges dangling Docker cache | [prune.sh](docker/prune.sh) |
 | **Log Management** | `json-file` log rotation with 20MB max-size per file | `docker inspect` |
 | **Secret Management** | All credentials injected via `.env.production` | Environment audit |

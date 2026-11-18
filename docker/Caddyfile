@@ -14,6 +14,11 @@
         -Server
     }
 
+    # Limit request body size to 15MB (prevents buffer overflow while allowing student CSV rosters)
+    request_body {
+        max_size 15MB
+    }
+
     # Reverse proxy upstream to Next.js application container
     reverse_proxy web:3000 {
         header_up Host {host}

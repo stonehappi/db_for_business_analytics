@@ -7,6 +7,9 @@ export async function runMigrations() {
 
     await client.query('BEGIN;');
 
+    // Acquire transaction-level advisory lock to prevent concurrent migrations during multi-replica starts
+    await client.query('SELECT pg_advisory_xact_lock(982347102);');
+
     // Enable extensions
     await client.query(`CREATE EXTENSION IF NOT EXISTS "pgcrypto";`);
 
