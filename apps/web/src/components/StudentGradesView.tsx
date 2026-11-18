@@ -55,10 +55,10 @@ export default function StudentGradesView({
   const breakdown = studentGradeRow?.assignment_breakdown || {};
 
   return (
-    <div className="h-[calc(100vh-3rem)] overflow-y-auto p-6 bg-canvas font-sans select-none">
-      <div className="max-w-4xl mx-auto space-y-6">
+    <div className="h-[calc(100vh-3rem)] overflow-y-auto p-3 sm:p-6 bg-canvas font-sans select-none">
+      <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6">
         {/* Student Profile & Summary Header */}
-        <div className="bg-surface border border-border rounded-lg p-5 flex items-center justify-between">
+        <div className="bg-surface border border-border rounded-lg p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="space-y-1">
             <div className="flex items-center space-x-2">
               <h2 className="text-base font-semibold text-ink">
@@ -74,7 +74,7 @@ export default function StudentGradesView({
           </div>
 
           <div className="flex items-center space-x-4">
-            <div className="text-right">
+            <div className="text-left sm:text-right">
               <span className="text-[11px] text-ink-secondary uppercase block font-medium">
                 Current Weighted Score
               </span>
@@ -108,8 +108,8 @@ export default function StudentGradesView({
             </span>
           </div>
 
-          <div className="border border-border rounded bg-surface overflow-hidden">
-            <table className="w-full text-left border-collapse text-xs font-mono">
+          <div className="border border-border rounded bg-surface overflow-x-auto">
+            <table className="w-full min-w-[560px] text-left border-collapse text-xs font-mono">
               <thead className="bg-subtle text-ink font-medium border-b border-border">
                 <tr>
                   <th className="p-3 border-r border-border">Assignment</th>
@@ -180,7 +180,7 @@ export default function StudentGradesView({
                   key={idx}
                   className="p-4 bg-surface border border-border rounded-lg space-y-2 text-xs"
                 >
-                  <div className="flex items-center justify-between border-b border-border pb-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border pb-2 gap-1">
                     <span className="font-semibold text-ink">{sub.assignment_title}</span>
                     <div className="flex items-center space-x-2 text-[11px] font-mono text-ink-secondary">
                       <span>Score: {sub.final_score ?? sub.verification_score} / {sub.max_score}</span>

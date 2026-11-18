@@ -1,11 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { queryApp } from '@db-platform/db';
-import { hashPassword, signToken, AUTH_COOKIE_NAME } from '@/lib/auth';
+import { hashPassword, getSessionUser } from '@/lib/auth';
 
 export async function POST(req: NextRequest) {
   try {
+    // Check authentication: self-registration for students is disabled
+    const sessionUser = await getSessionUser(req);
+    if (!sessionUser || (sessionUser.role !== 'teacher' && sessionUser.role !== 'ta')) {
+      return NextResponse.json(
+        {
+          error:
+            'Student self-registration is disabled. Student accounts are managed and provisioned directly by course instructors.',
+        },
+        { status: 403 }
+      );
+    }
+
     const body = await req.json();
-    const { fullName, email, password, studentIdCode } = body;
+    const { fullName, email, password, studentIdCode, cohortId } = body;
 
     if (!fullName || !email || !password) {
       return NextResponse.json(
@@ -52,45 +64,27 @@ export async function POST(req: NextRequest) {
 
     const newUser = insertUserRes.rows[0];
 
-    // Enroll into active cohort
-    const cohortRes = await queryApp(
-      `SELECT id FROM cohorts WHERE code = 'BA-2026-FALL-A' LIMIT 1;`
-    );
-    if (cohortRes.rowCount > 0) {
+    // Enroll into cohort if specified or default
+    const targetCohortId = cohortId;
+    if (targetCohortId) {
       await queryApp(
         `
         INSERT INTO cohort_enrollments (cohort_id, student_id)
         VALUES ($1, $2)
         ON CONFLICT (cohort_id, student_id) DO NOTHING;
       `,
-        [cohortRes.rows[0].id, newUser.id]
+        [targetCohortId, newUser.id]
       );
     }
 
-    // Generate JWT
-    const token = await signToken({
-      sub: newUser.id,
-      email: newUser.email,
-      role: newUser.role,
-      fullName: newUser.full_name,
-    });
-
-    const response = NextResponse.json(
-      { success: true, user: newUser },
+    return NextResponse.json(
+      {
+        success: true,
+        message: 'Student account created by instructor',
+        user: newUser,
+      },
       { status: 201 }
     );
-
-    response.cookies.set({
-      name: AUTH_COOKIE_NAME,
-      value: token,
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path: '/',
-      maxAge: 60 * 60 * 24 * 7,
-    });
-
-    return response;
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }

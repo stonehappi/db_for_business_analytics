@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { sandboxAdminPool } from '@db-platform/db';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   const client = await sandboxAdminPool.connect();
   try {

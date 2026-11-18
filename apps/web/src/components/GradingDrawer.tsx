@@ -43,7 +43,11 @@ export default function GradingDrawer({
   };
 
   return (
-    <div className="fixed inset-y-0 right-0 w-[580px] bg-surface border-l border-border shadow-xl z-50 flex flex-col font-sans select-none animate-in slide-in-from-right duration-150">
+    <>
+      {/* Backdrop for mobile */}
+      <div className="fixed inset-0 bg-black/40 backdrop-blur-xs z-40 sm:hidden" onClick={onClose} />
+
+      <div className="fixed inset-y-0 right-0 w-full sm:w-[520px] md:w-[580px] max-w-full bg-surface border-l border-border shadow-2xl z-50 flex flex-col font-sans select-none animate-in slide-in-from-right duration-150">
       {/* Drawer Header */}
       <div className="h-14 px-4 border-b border-border bg-subtle/50 flex items-center justify-between">
         <div>
@@ -184,5 +188,6 @@ export default function GradingDrawer({
         </div>
       </div>
     </div>
+    </>
   );
 }

@@ -43,6 +43,29 @@ services:
       timeout: 3s
       retries: 10
 
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: db_platform_web
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DATABASE_URL=postgresql://postgres:postgres@postgres-app:5432/app_db
+      - SANDBOX_ADMIN_DATABASE_URL=postgresql://postgres:postgres@postgres-sandbox:5432/sandbox_db
+      - SANDBOX_STUDENT_DATABASE_URL=postgresql://student_sandbox_user:sandbox_safe_pw@postgres-sandbox:5432/sandbox_db
+      - JWT_SECRET=${JWT_SECRET:-antigravity-secure-jwt-secret-key-production-2026-business-analytics}
+      - AUTO_MIGRATE=true
+      - AUTO_SEED=true
+    depends_on:
+      postgres-app:
+        condition: service_healthy
+      postgres-sandbox:
+        condition: service_healthy
+
 volumes:
   postgres_app_data:
   postgres_sandbox_data:

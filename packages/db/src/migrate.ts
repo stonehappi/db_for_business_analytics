@@ -123,8 +123,27 @@ export async function runMigrations() {
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
       ALTER TABLE master_modules ADD COLUMN IF NOT EXISTS course_id UUID REFERENCES master_courses(id) ON DELETE CASCADE;
+      ALTER TABLE master_modules ADD COLUMN IF NOT EXISTS lecture_slides_html TEXT;
+      ALTER TABLE master_modules ADD COLUMN IF NOT EXISTS quiz_data JSONB DEFAULT '[]'::JSONB;
       CREATE INDEX IF NOT EXISTS idx_master_modules_course ON master_modules(course_id);
       CREATE INDEX IF NOT EXISTS idx_master_modules_sort ON master_modules(sort_order);
+    `);
+
+    // Quiz Submissions Table (Records student quiz results per module)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS quiz_submissions (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        module_id UUID NOT NULL REFERENCES master_modules(id) ON DELETE CASCADE,
+        student_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        cohort_id UUID REFERENCES cohorts(id) ON DELETE CASCADE,
+        score NUMERIC(5, 2) NOT NULL,
+        max_score NUMERIC(5, 2) NOT NULL,
+        answers JSONB NOT NULL DEFAULT '[]'::JSONB,
+        submitted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        UNIQUE(module_id, student_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_quiz_submissions_module ON quiz_submissions(module_id);
+      CREATE INDEX IF NOT EXISTS idx_quiz_submissions_student ON quiz_submissions(student_id);
     `);
 
     // Master Assignments

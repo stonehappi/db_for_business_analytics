@@ -67,8 +67,8 @@ export default function CourseManagementModal({
         </div>
 
         {/* Courses Table */}
-        <div className="flex-1 overflow-y-auto border border-border rounded divide-y divide-border bg-white">
-          <table className="w-full text-left border-collapse text-xs">
+        <div className="flex-1 overflow-auto border border-border rounded divide-y divide-border bg-white">
+          <table className="w-full min-w-[500px] text-left border-collapse text-xs">
             <thead>
               <tr className="bg-subtle border-b border-border text-ink-secondary font-medium">
                 <th className="py-2 px-3 font-mono">Code</th>

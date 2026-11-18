@@ -40,3 +40,42 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #A1A1AA;
 }
+
+/* Slide Presentation Utilitarian Styles */
+.slide-badge {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  margin-bottom: 0.5rem;
+}
+
+.slide-title {
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  margin-bottom: 1rem;
+}
+
+.slide-lead {
+  font-size: 0.925rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-bottom: 1rem;
+}
+
+.slide-body {
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+
+.slide-list {
+  list-style-type: none;
+  padding-left: 0;
+}
+
+.callout-box {
+  border-radius: 4px;
+}

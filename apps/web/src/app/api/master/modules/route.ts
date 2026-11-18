@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
     if (courseId) {
       modulesRes = await queryApp(
         `
-        SELECT id, course_id, title, slug, description, week_number, sort_order
+        SELECT id, course_id, title, slug, description, week_number, sort_order, lecture_slides_html, quiz_data
         FROM master_modules
         WHERE course_id = $1
         ORDER BY sort_order ASC;
@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
       );
     } else {
       modulesRes = await queryApp(`
-        SELECT id, course_id, title, slug, description, week_number, sort_order
+        SELECT id, course_id, title, slug, description, week_number, sort_order, lecture_slides_html, quiz_data
         FROM master_modules
         ORDER BY sort_order ASC;
       `);
@@ -40,6 +40,8 @@ export async function GET(req: NextRequest) {
       description: m.description,
       weekNumber: m.week_number,
       sortOrder: m.sort_order,
+      lectureSlidesHtml: m.lecture_slides_html || '',
+      quizData: m.quiz_data || [],
       assignments: assignmentsRes.rows
         .filter((a: any) => a.module_id === m.id)
         .map((a: any) => ({
@@ -94,6 +96,67 @@ export async function POST(req: NextRequest) {
     );
 
     return NextResponse.json(res.rows[0], { status: 201 });
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
+}
+
+export async function PUT(req: NextRequest) {
+  try {
+    const user = await getSessionUser(req);
+    if (!user || (user.role !== 'teacher' && user.role !== 'admin')) {
+      return NextResponse.json(
+        { error: 'Forbidden: Only teachers can update master modules' },
+        { status: 403 }
+      );
+    }
+
+    const body = await req.json();
+    const { id, lectureSlidesHtml, quizData, title, description } = body;
+
+    if (!id) {
+      return NextResponse.json({ error: 'Module id is required' }, { status: 400 });
+    }
+
+    const updates: string[] = [];
+    const values: any[] = [];
+    let idx = 1;
+
+    if (lectureSlidesHtml !== undefined) {
+      updates.push(`lecture_slides_html = $${idx++}`);
+      values.push(lectureSlidesHtml);
+    }
+    if (quizData !== undefined) {
+      updates.push(`quiz_data = $${idx++}`);
+      values.push(JSON.stringify(quizData));
+    }
+    if (title !== undefined) {
+      updates.push(`title = $${idx++}`);
+      values.push(title);
+    }
+    if (description !== undefined) {
+      updates.push(`description = $${idx++}`);
+      values.push(description);
+    }
+
+    if (updates.length === 0) {
+      return NextResponse.json({ error: 'No fields to update' }, { status: 400 });
+    }
+
+    values.push(id);
+    const sql = `
+      UPDATE master_modules
+      SET ${updates.join(', ')}, updated_at = NOW()
+      WHERE id = $${idx}
+      RETURNING *;
+    `;
+
+    const res = await queryApp(sql, values);
+    if (res.rowCount === 0) {
+      return NextResponse.json({ error: 'Module not found' }, { status: 404 });
+    }
+
+    return NextResponse.json(res.rows[0]);
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }

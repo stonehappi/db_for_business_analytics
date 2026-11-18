@@ -11,6 +11,7 @@ interface ClassManagementModalProps {
   selectedCohortId: string;
   onSelectClass: (cohortId: string) => void;
   onOpenCreateClass: () => void;
+  onOpenStudentManagement?: (cohortId?: string) => void;
   courseTitle?: string;
 }
 
@@ -21,6 +22,7 @@ export default function ClassManagementModal({
   selectedCohortId,
   onSelectClass,
   onOpenCreateClass,
+  onOpenStudentManagement,
   courseTitle,
 }: ClassManagementModalProps) {
   if (!isOpen) return null;
@@ -69,8 +71,8 @@ export default function ClassManagementModal({
         </div>
 
         {/* Classes Table */}
-        <div className="flex-1 overflow-y-auto border border-border rounded divide-y divide-border bg-white">
-          <table className="w-full text-left border-collapse text-xs">
+        <div className="flex-1 overflow-auto border border-border rounded divide-y divide-border bg-white">
+          <table className="w-full min-w-[500px] text-left border-collapse text-xs">
             <thead>
               <tr className="bg-subtle border-b border-border text-ink-secondary font-medium">
                 <th className="py-2 px-3 font-mono">Section Code</th>
@@ -120,7 +122,21 @@ export default function ClassManagementModal({
                     <td className="py-2.5 px-3 text-center font-mono">
                       {cls.student_count ?? 0}
                     </td>
-                    <td className="py-2.5 px-3 text-right space-x-1">
+                    <td className="py-2.5 px-3 text-right space-x-1.5">
+                      {onOpenStudentManagement && (
+                        <button
+                          onClick={() => {
+                            onClose();
+                            onOpenStudentManagement(cls.id);
+                          }}
+                          data-testid={`modal-manage-class-students-${cls.id}`}
+                          title="Manage Student Roster"
+                          className="px-2 py-1 text-xs border border-border bg-white hover:bg-subtle text-ink rounded transition-colors inline-flex items-center space-x-1"
+                        >
+                          <Users className="w-3 h-3" />
+                          <span>Roster</span>
+                        </button>
+                      )}
                       {isSelected ? (
                         <span className="inline-flex items-center space-x-1 text-[11px] font-medium text-status-success px-2 py-0.5 rounded bg-green-50 border border-green-200">
                           <Check className="w-3 h-3" />

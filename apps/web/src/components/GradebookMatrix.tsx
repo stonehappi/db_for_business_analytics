@@ -12,6 +12,7 @@ import {
   BarChart3,
 } from 'lucide-react';
 import GradingDrawer from './GradingDrawer';
+import { ConfirmDialog } from './Dialog';
 
 interface GradebookMatrixProps {
   cohortId: string;
@@ -130,25 +131,25 @@ export default function GradebookMatrix({
   return (
     <div className="h-[calc(100vh-3rem)] flex flex-col bg-canvas overflow-hidden">
       {/* Top Action Toolbar */}
-      <div className="h-14 px-4 border-b border-border bg-surface flex items-center justify-between shrink-0">
-        <div className="flex items-center space-x-3">
-          <div>
-            <div className="text-xs font-semibold text-ink flex items-center space-x-2">
+      <div className="min-h-[3.5rem] py-2 px-3 sm:px-4 border-b border-border bg-surface flex flex-col md:flex-row md:items-center justify-between gap-2 shrink-0">
+        <div className="flex items-center space-x-3 overflow-hidden">
+          <div className="min-w-0">
+            <div className="text-xs font-semibold text-ink flex items-center space-x-2 truncate">
               {cohort?.course_code && (
-                <span className="px-1.5 py-0.5 rounded bg-subtle text-[10px] font-mono border border-border">
+                <span className="px-1.5 py-0.5 rounded bg-subtle text-[10px] font-mono border border-border shrink-0">
                   [{cohort.course_code}]
                 </span>
               )}
-              <span>{cohort?.name}</span>
-              <span className="font-mono text-ink-secondary text-[11px]">({cohort?.code})</span>
+              <span className="truncate">{cohort?.name}</span>
+              <span className="font-mono text-ink-secondary text-[11px] shrink-0">({cohort?.code})</span>
             </div>
-            <div className="text-[11px] text-ink-secondary">
+            <div className="text-[11px] text-ink-secondary truncate">
               {cohort?.course_title ? `${cohort.course_title} • ` : ''}Semester: {cohort?.term} • {students.length} Enrolled Students
             </div>
           </div>
 
           <div
-            className={`px-2 py-0.5 rounded text-[11px] font-mono border flex items-center space-x-1.5 ${
+            className={`px-2 py-0.5 rounded text-[11px] font-mono border flex items-center space-x-1.5 shrink-0 ${
               isCompleted
                 ? 'bg-red-50 border-status-danger/30 text-status-danger'
                 : 'bg-green-50 border-status-success/30 text-status-success'
@@ -164,7 +165,7 @@ export default function GradebookMatrix({
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-2 shrink-0">
           {/* Complete Class & Lock Grades */}
           <button
             onClick={() => setShowConfirmModal(true)}
@@ -177,7 +178,10 @@ export default function GradebookMatrix({
             }`}
           >
             <Lock className="w-3.5 h-3.5" />
-            <span>{isCompleted ? 'Class Completed & Locked' : 'Complete Class & Lock Grades'}</span>
+            <span>
+              <span className="hidden sm:inline">{isCompleted ? 'Class Completed & Locked' : 'Complete Class & Lock Grades'}</span>
+              <span className="sm:hidden">{isCompleted ? 'Locked' : 'Lock Grades'}</span>
+            </span>
           </button>
 
           {/* Export Final Scores Dropdown */}
@@ -361,42 +365,24 @@ export default function GradebookMatrix({
         />
       )}
 
-      {/* Confirmation Modal for Finalizing Cohort */}
-      {showConfirmModal && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-          <div className="bg-surface border border-border rounded-lg shadow-xl max-w-md w-full p-5 space-y-4 font-sans animate-in fade-in duration-100">
-            <div className="flex items-center space-x-2.5 text-status-danger">
-              <AlertTriangle className="w-5 h-5" />
-              <h3 className="text-sm font-semibold text-ink">
-                Finalize Class & Lock Cohort Grades?
-              </h3>
-            </div>
-
-            <p className="text-xs text-ink-secondary leading-relaxed">
-              This will lock the cohort <span className="font-mono text-ink font-medium">{cohort?.code}</span>.
-              All final student weighted scores and letter grades will be permanently snapshotted in the university database.
-              Further student submissions will be closed.
-            </p>
-
-            <div className="flex items-center justify-end space-x-2 pt-2 border-t border-border">
-              <button
-                onClick={() => setShowConfirmModal(false)}
-                className="px-3 py-1.5 text-xs text-ink-secondary hover:text-ink rounded hover:bg-subtle transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleFinalizeCohort}
-                disabled={isFinalizing}
-                data-testid="confirm-lock-grades-btn"
-                className="px-3 py-1.5 text-xs bg-ink text-white rounded hover:bg-ink-secondary transition-colors disabled:opacity-50"
-              >
-                {isFinalizing ? 'Locking...' : 'Yes, Lock & Finalize Grades'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Confirmation Dialog for Finalizing Cohort */}
+      <ConfirmDialog
+        isOpen={showConfirmModal}
+        onClose={() => setShowConfirmModal(false)}
+        onConfirm={handleFinalizeCohort}
+        isLoading={isFinalizing}
+        title="Finalize Class & Lock Cohort Grades?"
+        variant="danger"
+        confirmText={isFinalizing ? 'Locking...' : 'Yes, Lock & Finalize Grades'}
+        confirmTestId="confirm-lock-grades-btn"
+        cancelTestId="cancel-lock-grades-btn"
+      >
+        <p className="text-xs text-ink-secondary leading-relaxed">
+          This will lock the cohort <span className="font-mono text-ink font-medium">{cohort?.code}</span>.
+          All final student weighted scores and letter grades will be permanently snapshotted in the university database.
+          Further student submissions will be closed.
+        </p>
+      </ConfirmDialog>
     </div>
   );
 }

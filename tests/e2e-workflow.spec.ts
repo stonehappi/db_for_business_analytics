@@ -34,10 +34,13 @@ test.describe('Database Learning Platform & Project Management E2E', () => {
     await expect(page.locator('[data-testid="tab-gradebook"]')).toBeVisible();
     await expect(page.locator('[data-testid="tab-curriculum"]')).toBeVisible();
 
-    // 4. Test Sign Out
+    // 4. Test Sign Out with confirmation dialog
     const logoutBtn = page.locator('[data-testid="logout-btn"]');
     await expect(logoutBtn).toBeVisible();
     await logoutBtn.click();
+    const confirmLogout = page.locator('[data-testid="confirm-signout-btn"]');
+    await expect(confirmLogout).toBeVisible();
+    await confirmLogout.click();
     await page.waitForURL(/\/login/);
 
     // 5. One-Click Demo Persona Login as Student (Sokha Chan)
@@ -57,23 +60,27 @@ test.describe('Database Learning Platform & Project Management E2E', () => {
     await expect(page.locator('text=Current Weighted Score')).toBeVisible();
     await expect(page.locator('text=Assignment Scores & Grade Contributions')).toBeVisible();
 
-    // 7. Test Student Registration
+    // 7. Verify Student Self-Registration is strictly disabled
     await page.locator('[data-testid="logout-btn"]').click();
+    await page.locator('[data-testid="confirm-signout-btn"]').click();
     await page.waitForURL(/\/login/);
 
-    await page.locator('[data-testid="switch-to-register-btn"]').click();
-    await expect(page.locator('text=Student Course Enrollment')).toBeVisible();
+    // Registration switch button should NOT exist on login page
+    await expect(page.locator('[data-testid="switch-to-register-btn"]')).not.toBeVisible();
+    await expect(page.getByTestId('registration-closed-notice')).toBeVisible();
+    await expect(page.getByTestId('registration-closed-notice')).toContainText(/Student self-registration is closed/i);
 
-    const timestamp = Date.now();
-    await page.fill('[data-testid="register-name"]', `New Student ${timestamp}`);
-    await page.fill('[data-testid="register-student-id"]', `STU-NEW-${timestamp.toString().slice(-4)}`);
-    await page.fill('[data-testid="register-email"]', `newstudent${timestamp}@uni.edu`);
-    await page.fill('[data-testid="register-password"]', 'Password123!');
-    await page.click('[data-testid="register-submit-btn"]');
-
-    // Automatically logs in and lands on dashboard
-    await page.waitForURL('/');
-    await expect(page.getByTestId('role-mode-badge')).toContainText(/student mode/i);
+    // Direct API attempt to register without instructor auth must be rejected with 403 Forbidden
+    const unauthRegRes = await page.request.post('/api/auth/register', {
+      data: {
+        fullName: 'Unauthorized Student',
+        email: `unauth-${Date.now()}@uni.edu`,
+        password: 'Password123!',
+      },
+    });
+    expect(unauthRegRes.status()).toBe(403);
+    const unauthData = await unauthRegRes.json();
+    expect(unauthData.error).toContain('disabled');
   });
 
   test('2. Teacher can inspect 16-week master curriculum and publish assignment', async ({ page }) => {
@@ -364,6 +371,253 @@ test.describe('Database Learning Platform & Project Management E2E', () => {
     await expect(classMgmtModal.locator('td >> text=BA-2026-FALL-A')).toBeVisible();
     await classMgmtModal.locator('button:has-text("Close")').click();
     await expect(classMgmtModal).not.toBeVisible();
+  });
+
+  test('10. Weekly Curriculum: Lecture (HTML slides), Exercise/Quiz (interactive auto-scoring), and Project support for every week', async ({ page }) => {
+    // A. Student Experience: Lecture Slides, Interactive Quiz, Project Workspace & Week Selector
+    await loginAs(page, 'sokha.c@uni.edu');
+
+    await page.locator('[data-testid="tab-workspace"]').click();
+
+    // 1. Check Top 3 Pillar Tabs
+    const lectureTab = page.locator('[data-testid="student-tab-lecture"]');
+    const quizTab = page.locator('[data-testid="student-tab-quiz"]');
+    const projectTab = page.locator('[data-testid="student-tab-project"]');
+
+    await expect(lectureTab).toBeVisible();
+    await expect(quizTab).toBeVisible();
+    await expect(projectTab).toBeVisible();
+
+    // 2. Test Lecture (HTML as slide deck)
+    await lectureTab.click();
+    const slideViewer = page.locator('[data-testid="lecture-slide-viewer"]');
+    await expect(slideViewer).toBeVisible();
+    await expect(page.locator('[data-testid="slide-counter-badge"]')).toContainText(/slide 1 of/i);
+
+    // Navigate to next slide
+    const nextBtn = page.locator('[data-testid="next-slide-btn"]');
+    await expect(nextBtn).toBeVisible();
+    await nextBtn.click();
+    await expect(page.locator('[data-testid="slide-counter-badge"]')).toContainText(/slide 2 of/i);
+
+    // Navigate back to previous slide
+    const prevBtn = page.locator('[data-testid="prev-slide-btn"]');
+    await prevBtn.click();
+    await expect(page.locator('[data-testid="slide-counter-badge"]')).toContainText(/slide 1 of/i);
+
+    // Switch view mode to continuous document
+    const docModeBtn = page.locator('[data-testid="slide-mode-doc-btn"]');
+    await docModeBtn.click();
+    await expect(page.locator('[data-testid="continuous-slide-doc"]')).toBeVisible();
+
+    // Switch back to deck mode
+    const deckModeBtn = page.locator('[data-testid="slide-mode-deck-btn"]');
+    await deckModeBtn.click();
+    await expect(page.locator('[data-testid="active-slide-canvas"]')).toBeVisible();
+
+    // 3. Test Exercise / Quiz
+    await quizTab.click();
+    const quizViewer = page.locator('[data-testid="quiz-exercise-viewer"]');
+    await expect(quizViewer).toBeVisible();
+
+    // If already submitted in a previous run, click Retake Quiz to reset form
+    const existingRetakeBtn = page.locator('[data-testid="retake-quiz-btn"]');
+    if (await existingRetakeBtn.isVisible()) {
+      await existingRetakeBtn.click();
+    }
+
+    // Verify multiple-choice questions exist
+    await expect(page.locator('[data-testid="quiz-question-card-1"]')).toBeVisible();
+    await expect(page.locator('[data-testid="quiz-question-card-2"]')).toBeVisible();
+
+    // Select options for questions
+    await page.locator('[data-testid="option-1-1"]').click(); // Option B
+    await page.locator('[data-testid="option-2-1"]').click(); // Option B
+    await page.locator('[data-testid="option-3-1"]').click(); // Option B
+
+    // Submit quiz
+    const submitQuizBtn = page.locator('[data-testid="submit-quiz-btn"]');
+    await expect(submitQuizBtn).toBeEnabled();
+    await submitQuizBtn.click();
+
+    // Verify auto-scored score banner and status badge
+    const scoreBanner = page.locator('[data-testid="quiz-score-banner"]');
+    await expect(scoreBanner).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('[data-testid="quiz-status-badge"]')).toBeVisible();
+
+    // Verify pedagogical explanation callout is displayed
+    await expect(page.locator('[data-testid="explanation-1"]')).toBeVisible();
+    await expect(page.locator('[data-testid="explanation-1"]')).toContainText(/pedagogical explanation/i);
+
+    // Retake quiz button works
+    const retakeBtn = page.locator('[data-testid="retake-quiz-btn"]');
+    await expect(retakeBtn).toBeVisible();
+    await retakeBtn.click();
+    await expect(page.locator('[data-testid="submit-quiz-btn"]')).toBeVisible();
+
+    // 4. Test Project (Existing Support)
+    await projectTab.click();
+    await expect(page.locator('text=Assignment Scenario')).toBeVisible();
+    await expect(page.locator('[data-testid="run-sandbox-btn"]')).toBeVisible();
+
+    // 5. Test Week Selector changes active module
+    const weekSelector = page.locator('[data-testid="student-week-selector"]');
+    await weekSelector.selectOption('2');
+    await expect(weekSelector).toHaveValue('2');
+
+    // Sign out student
+    await page.locator('[data-testid="logout-btn"]').click();
+    await page.locator('[data-testid="confirm-signout-btn"]').click();
+    await page.waitForURL(/\/login/);
+
+    // B. Teacher Experience in Master Curriculum: 3 Pillars per Week & Live HTML Slide Editing
+    await loginAs(page, 'prof.smith@uni.edu');
+    await page.locator('[data-testid="tab-curriculum"]').click();
+
+    // Inspect Week 1 Slide quick badge
+    const week1SlideBadge = page.locator('[data-testid="badge-lecture-1"]');
+    await expect(week1SlideBadge).toBeVisible();
+    await week1SlideBadge.click();
+
+    // Verify slide viewer is visible in curriculum detail canvas
+    await expect(page.locator('[data-testid="curriculum-tab-lecture"]')).toHaveClass(/border-border/);
+    await expect(page.locator('[data-testid="lecture-slide-viewer"]')).toBeVisible();
+
+    // Click Week 1 Quiz quick badge
+    const week1QuizBadge = page.locator('[data-testid="badge-quiz-1"]');
+    await week1QuizBadge.click();
+    await expect(page.locator('[data-testid="quiz-exercise-viewer"]')).toBeVisible();
+    await expect(page.locator('[data-testid="toggle-answer-key-btn"]')).toBeVisible();
+
+    // Click Week 1 Project quick badge
+    const week1ProjectBadge = page.locator('[data-testid="badge-project-1"]');
+    await week1ProjectBadge.click();
+    await expect(page.locator('text=Case Study Brief & Business Requirements')).toBeVisible();
+    await expect(page.locator('[data-testid="publish-to-cohort-btn"]')).toBeVisible();
+  });
+
+  test('11. Teacher manages students: manual student creation, bulk CSV import, roster export, and new student login verification', async ({ page }) => {
+    await loginAs(page, 'prof.smith@uni.edu');
+
+    // 1. Open Student Management via Sidebar
+    await expect(page.locator('[data-testid="btn-manage-students"]')).toBeVisible();
+    await page.locator('[data-testid="btn-manage-students"]').click();
+
+    const modal = page.locator('[data-testid="student-management-modal"]');
+    await expect(modal).toBeVisible();
+    await expect(modal.locator('text=Student Roster & Cohort Management')).toBeVisible();
+
+    // 2. Search student roster
+    const searchInput = modal.locator('[data-testid="search-students-input"]');
+    await searchInput.fill('Sokha');
+    await expect(modal.getByText('Sokha Chan')).toBeVisible();
+    await searchInput.fill('');
+
+    // 3. Add Student Manually
+    const timestamp = Date.now();
+    const newStudentEmail = `test.student.${timestamp}@uni.edu`;
+    const newStudentCode = `STU-T-${timestamp.toString().slice(-4)}`;
+
+    await modal.locator('[data-testid="tab-add-student"]').click();
+    await expect(modal.locator('[data-testid="form-add-student"]')).toBeVisible();
+
+    await modal.locator('[data-testid="input-student-name"]').fill(`Student Test ${timestamp}`);
+    await modal.locator('[data-testid="input-student-id-code"]').fill(newStudentCode);
+    await modal.locator('[data-testid="input-student-email"]').fill(newStudentEmail);
+    await modal.locator('[data-testid="input-student-password"]').fill('Password123!');
+    await modal.locator('[data-testid="btn-submit-add-student"]').click();
+
+    // Verify success banner and new student in roster
+    await expect(modal.getByTestId('student-success-banner')).toBeVisible();
+    await expect(modal.locator(`text=${newStudentEmail}`)).toBeVisible();
+
+    // 4. Bulk CSV Import Students
+    await modal.locator('[data-testid="tab-import-students"]').click();
+    await expect(modal.locator('[data-testid="form-import-students"]')).toBeVisible();
+    await expect(modal.locator('[data-testid="btn-download-csv-template"]')).toBeVisible();
+
+    const csvData = [
+      'student_id_code,full_name,email,password',
+      `STU-CSV-1-${timestamp},CSV Student One,csv.one.${timestamp}@uni.edu,Password123!`,
+      `STU-CSV-2-${timestamp},CSV Student Two,csv.two.${timestamp}@uni.edu,Password123!`,
+    ].join('\n');
+
+    await modal.locator('[data-testid="textarea-csv-import"]').fill(csvData);
+    await modal.locator('[data-testid="btn-submit-import-csv"]').click();
+
+    // Verify import results
+    await expect(modal.getByTestId('import-results-box')).toBeVisible();
+    await expect(modal.locator('text=Import Completed Successfully')).toBeVisible();
+
+    // Switch back to roster and verify imported students
+    await modal.locator('[data-testid="tab-roster-view"]').click();
+    await expect(modal.locator(`text=csv.one.${timestamp}@uni.edu`)).toBeVisible();
+    await expect(modal.locator(`text=csv.two.${timestamp}@uni.edu`)).toBeVisible();
+
+    // 5. Test Export CSV endpoint
+    const exportRes = await page.request.get('/api/students/export?format=csv');
+    expect(exportRes.status()).toBe(200);
+    const exportText = await exportRes.text();
+    expect(exportText).toContain('Student_ID,Full_Name,Email');
+    expect(exportText).toContain('csv.one.');
+
+    // Close modal
+    await modal.locator('button:has-text("Close")').click();
+    await expect(modal).not.toBeVisible();
+
+    // 6. Verify newly teacher-provisioned student can log in and access workspace
+    await page.locator('[data-testid="logout-btn"]').click();
+    await page.locator('[data-testid="confirm-signout-btn"]').click();
+    await page.waitForURL(/\/login/);
+
+    await page.fill('[data-testid="input-email"]', newStudentEmail);
+    await page.fill('[data-testid="input-password"]', 'Password123!');
+    await page.click('[data-testid="login-submit-btn"]');
+
+    await page.waitForURL('/');
+    await expect(page.getByTestId('role-mode-badge')).toContainText(/student mode/i);
+    await expect(page.locator('[data-testid="tab-workspace"]')).toBeVisible();
+  });
+
+  test('12. URL Route Management & Deep Linking: direct URL navigation, query redirect after login, and browser back/forward history traversal', async ({ page }) => {
+    const courseId = '11111111-0000-0000-0000-000000000001';
+    const cohortId = 'a1b2c3d4-0000-1111-2222-333333333333';
+    const curriculumPath = `/courses/${courseId}/cohorts/${cohortId}/curriculum`;
+    const gradebookPath = `/courses/${courseId}/cohorts/${cohortId}/gradebook`;
+
+    // 1. Unauthenticated deep link access should redirect to /login with redirect query param
+    await page.goto(curriculumPath);
+    await page.waitForURL(/\/login\?redirect=/);
+    await expect(page.locator('text=Sign in to your account')).toBeVisible();
+
+    // 2. Logging in redirects directly to the originally requested deep link
+    await page.fill('[data-testid="input-email"]', 'prof.smith@uni.edu');
+    await page.fill('[data-testid="input-password"]', 'Password123!');
+    await page.click('[data-testid="login-submit-btn"]');
+
+    await page.waitForURL(curriculumPath, { timeout: 10000 });
+    await expect(page.locator('text=16-Week Master Syllabus')).toBeVisible();
+
+    // 3. Tab switching updates the browser URL path
+    await page.locator('[data-testid="tab-gradebook"]').click();
+    await page.waitForURL(gradebookPath, { timeout: 5000 });
+    await expect(page.locator('th >> text=Student ID')).toBeVisible();
+
+    // 4. Browser Back button returns to curriculum path and restores view
+    await page.goBack();
+    await page.waitForURL(curriculumPath, { timeout: 5000 });
+    await expect(page.locator('text=16-Week Master Syllabus')).toBeVisible();
+
+    // 5. Browser Forward button returns to gradebook path and restores view
+    await page.goForward();
+    await page.waitForURL(gradebookPath, { timeout: 5000 });
+    await expect(page.locator('th >> text=Student ID')).toBeVisible();
+
+    // 6. Direct URL navigation to workspace
+    const workspacePath = `/courses/${courseId}/cohorts/${cohortId}/workspace`;
+    await page.goto(workspacePath);
+    await page.waitForURL(workspacePath, { timeout: 5000 });
+    await expect(page.locator('text=Assignment Scenario')).toBeVisible();
   });
 
 });

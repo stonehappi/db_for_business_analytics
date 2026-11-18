@@ -1,5 +1,6 @@
 import { appPool, sandboxAdminPool } from './client';
 import bcrypt from 'bcryptjs';
+import { weeklyCurriculum } from './curriculumContent';
 
 export async function runSeed() {
   console.log('[SEED] Starting seed script...');
@@ -194,41 +195,26 @@ export async function runSeed() {
     }
 
     // 4. Seed 16-Week Master Modules
-    console.log('[SEED] Seeding 16-week master modules for BA-101...');
+    console.log('[SEED] Seeding 16-week master modules for BA-101 with lecture slides & quiz data...');
     const ba101CourseId = '11111111-0000-0000-0000-000000000001';
-    const modules = [
-      { num: 1, title: 'Week 1: Business Reality to Relational Abstraction', slug: 'w1-business-reality-relational-abstraction', desc: 'Entities vs attributes, candidate keys, surrogate vs natural keys' },
-      { num: 2, title: 'Week 2: Relational Cardinality & One-to-Many Relationships', slug: 'w2-cardinality-one-to-many', desc: 'Parent-child hierarchies, 1:M relationships, Crow\'s Foot notation' },
-      { num: 3, title: 'Week 3: Advanced ER-Diagramming & Business Rules', slug: 'w3-advanced-er-diagramming', desc: 'Crow\'s Foot standards, recursive relationships, cascade constraints' },
-      { num: 4, title: 'Week 4: Functional Dependencies & First Normal Form (1NF)', slug: 'w4-functional-dependencies-1nf', desc: 'Anomalies, functional dependencies, atomic attributes' },
-      { num: 5, title: 'Week 5: Second (2NF) and Third Normal Form (3NF)', slug: 'w5-2nf-3nf-decomposition', desc: 'Full vs partial dependency, transitive dependency, eliminating redundancy' },
-      { num: 6, title: 'Week 6: Boyce-Codd Normal Form (BCNF) & Practical Denormalization', slug: 'w6-bcnf-practical-denormalization', desc: 'BCNF edge cases, intentional denormalization in analytics' },
-      { num: 7, title: 'Week 7: Physical Schema Implementation in PostgreSQL', slug: 'w7-physical-schema-postgresql', desc: 'PostgreSQL DDL, constraints, data types, indexes' },
-      { num: 8, title: 'Week 8: Midterm Examination & Practical Schema Defense', slug: 'w8-midterm-assessment', desc: 'Midterm Theory & Hands-on Modeling Challenge' },
-      { num: 9, title: 'Week 9: OLTP vs. OLAP Paradigms', slug: 'w9-oltp-vs-olap', desc: 'Transactional write throughput vs analytical scan performance' },
-      { num: 10, title: 'Week 10: Dimensional Modeling Fundamentals (Facts & Dimensions)', slug: 'w10-facts-and-dimensions', desc: 'Fact table grain, additive and semi-additive metrics' },
-      { num: 11, title: 'Week 11: Star Schema & Snowflake Schema Architecture', slug: 'w11-star-and-snowflake-schemas', desc: 'Star Schema design, dimensional 1:M relationships, date dimensions' },
-      { num: 12, title: 'Week 12: Advanced Dimensional Modeling & Slowly Changing Dimensions (SCD)', slug: 'w12-slowly-changing-dimensions', desc: 'SCD Type 1, Type 2, and Type 3 temporal tracking' },
-      { num: 13, title: 'Week 13: PostgreSQL for Analytics: Materialized Views & Indexing', slug: 'w13-materialized-views-indexing', desc: 'Materialized aggregates, BRIN indexes, window functions' },
-      { num: 14, title: 'Week 14: Capstone Phase 1: Physical Warehouse Implementation', slug: 'w14-capstone-phase-1', desc: 'Full DDL deployment and initial data warehouse seeding' },
-      { num: 15, title: 'Week 15: Capstone Phase 2: Business Intelligence Validation', slug: 'w15-capstone-phase-2', desc: 'Advanced analytical reporting, YoY growth, cohort retention queries' },
-      { num: 16, title: 'Week 16: Final Examination & Capstone Defense', slug: 'w16-final-assessment', desc: 'Comprehensive final exam and live schema defense' },
-    ];
-
     const moduleMap: Record<number, string> = {};
 
-    for (const m of modules) {
+    for (const m of weeklyCurriculum) {
       const res = await client.query(`
-        INSERT INTO master_modules (course_id, title, slug, description, week_number, sort_order)
-        VALUES ($1, $2, $3, $4, $5, $6)
+        INSERT INTO master_modules (
+          course_id, title, slug, description, week_number, sort_order, lecture_slides_html, quiz_data
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         ON CONFLICT (slug) DO UPDATE SET
           course_id = EXCLUDED.course_id,
           title = EXCLUDED.title,
           description = EXCLUDED.description,
           week_number = EXCLUDED.week_number,
-          sort_order = EXCLUDED.sort_order
+          sort_order = EXCLUDED.sort_order,
+          lecture_slides_html = EXCLUDED.lecture_slides_html,
+          quiz_data = EXCLUDED.quiz_data
         RETURNING id;
-      `, [ba101CourseId, m.title, m.slug, m.desc, m.num, m.num]);
+      `, [ba101CourseId, m.title, m.slug, m.desc, m.num, m.num, m.lectureSlidesHtml, JSON.stringify(m.quizData)]);
       moduleMap[m.num] = res.rows[0].id;
     }
 
@@ -621,9 +607,34 @@ ORDER BY order_year DESC;`,
       }
     ];
 
+    const assignmentsWithOrder = assignments.map((a, idx) => ({
+      ...a,
+      sortOrder: idx + 1,
+    }));
+
+    const miniAssignments = weeklyCurriculum
+      .filter((w) => w.project)
+      .map((w) => ({
+        id: w.project!.id,
+        weekNum: w.num,
+        title: w.project!.title,
+        slug: w.project!.slug,
+        type: w.project!.type,
+        maxScore: w.project!.maxScore,
+        weightPercentage: w.project!.weightPercentage,
+        businessCase: w.project!.businessCase,
+        starterSql: w.project!.starterSql,
+        solutionSql: w.project!.solutionSql,
+        verificationSql: w.project!.verificationSql,
+        rubric: w.project!.rubric,
+        sortOrder: 100 + w.num,
+      }));
+
+    const allAssignments = [...assignmentsWithOrder, ...miniAssignments];
+
     const assignmentIdMap: Record<string, string> = {};
 
-    for (const a of assignments) {
+    for (const a of allAssignments) {
       const moduleId = moduleMap[a.weekNum];
       await client.query(`
         INSERT INTO master_assignments (
@@ -639,9 +650,10 @@ ORDER BY order_year DESC;`,
           verification_sql = EXCLUDED.verification_sql,
           max_score = EXCLUDED.max_score,
           weight_percentage = EXCLUDED.weight_percentage,
-          rubric_criteria = EXCLUDED.rubric_criteria;
+          rubric_criteria = EXCLUDED.rubric_criteria,
+          sort_order = EXCLUDED.sort_order;
       `, [
-        a.id, moduleId, a.title, a.slug, a.type, a.businessCase, a.starterSql, a.solutionSql, a.verificationSql, a.maxScore, a.weightPercentage, JSON.stringify(a.rubric), a.weekNum
+        a.id, moduleId, a.title, a.slug, a.type, a.businessCase, a.starterSql, a.solutionSql, a.verificationSql, a.maxScore, a.weightPercentage, JSON.stringify(a.rubric), a.sortOrder
       ]);
 
       // Publish to Cohort

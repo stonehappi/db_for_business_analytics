@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import { DialogProvider } from '@/components/Dialog';
 
 export const metadata: Metadata = {
   title: 'Database Design & Learning System | Business Analytics',
@@ -14,7 +15,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="bg-canvas text-ink antialiased min-h-screen selection:bg-subtle">
-        {children}
+        <DialogProvider>
+          {children}
+        </DialogProvider>
       </body>
     </html>
   );

@@ -1,11 +1,16 @@
 import { Pool } from 'pg';
-import * as dotenv from 'dotenv';
 import path from 'path';
 
-// Load environment variables
-dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
-dotenv.config({ path: path.resolve(process.cwd(), '../../.env.local') });
-dotenv.config();
+// Load environment variables if dotenv is available
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const dotenv = require('dotenv');
+  dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
+  dotenv.config({ path: path.resolve(process.cwd(), '../../.env.local') });
+  dotenv.config();
+} catch {
+  // Environment variables already populated by host/container environment
+}
 
 const appDbUrl = process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/app_db';
 const sandboxAdminUrl = process.env.SANDBOX_ADMIN_DATABASE_URL || 'postgresql://postgres:postgres@localhost:5435/sandbox_db';

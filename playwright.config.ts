@@ -19,9 +19,9 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'npm run start --workspace=apps/web',
+    command: 'npx next start apps/web -p 3000',
     url: 'http://localhost:3000',
-    reuseExistingServer: false,
+    reuseExistingServer: true,
     timeout: 60000,
   },
 });
