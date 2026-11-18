@@ -86,6 +86,91 @@ Open your browser and navigate to `https://analytics.yourdomain.com` — your pl
 
 ---
 
+## 3. Connecting the Tunnel Manually (Host CLI)
+
+If you prefer to start the core Docker containers normally and manage your tunnel **manually from the Linux terminal** (or without adding the tunnel to docker-compose):
+
+First, ensure your application containers are running:
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+```
+*(The web container is automatically bound to `127.0.0.1:3000` on your Linux host).*
+
+### Install `cloudflared` on Linux:
+* **Ubuntu / Debian**:
+  ```bash
+  curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg | sudo tee /etc/apt/trusted.gpg.d/cloudflare.gpg >/dev/null
+  echo "deb [signed-by=/etc/apt/trusted.gpg.d/cloudflare.gpg] https://pkg.cloudflare.com/cloudflared $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/cloudflared.list
+  sudo apt-get update && sudo apt-get install -y cloudflared
+  ```
+* **Arch Linux**:
+  ```bash
+  sudo pacman -S cloudflared
+  ```
+* **Standalone Binary (Any Linux distro)**:
+  ```bash
+  curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o cloudflared
+  chmod +x cloudflared && sudo mv cloudflared /usr/local/bin/
+  ```
+
+---
+
+### Manual Method A: Instant Quick Tunnel (No Domain, No Account Needed)
+Need to test or share a temporary link right now? Cloudflare provides a free instant HTTPS tunnel with one command:
+```bash
+cloudflared tunnel --url http://localhost:3000
+```
+This generates a temporary public HTTPS URL instantly:
+```text
++--------------------------------------------------------------------------------------------+
+|  Your quick Tunnel has been created! Visit it at:                                          |
+|  https://random-phrase-abc-123.trycloudflare.com                                           |
++--------------------------------------------------------------------------------------------+
+```
+Share this URL with students or testers. Press `Ctrl + C` when you are done.
+
+---
+
+### Manual Method B: Run Your Configured Tunnel via CLI
+If you created a named tunnel in the Cloudflare Zero Trust dashboard:
+1. In Cloudflare Dashboard → Public Hostname → Set URL to `http://localhost:3000`.
+2. Run manually in your terminal:
+   ```bash
+   cloudflared tunnel run --token <YOUR_CLOUDFLARE_TUNNEL_TOKEN>
+   ```
+
+---
+
+### Manual Method C: Install as a Persistent Linux `systemd` Service
+To have the tunnel run permanently as a Linux background service that starts automatically on boot:
+```bash
+sudo cloudflared service install <YOUR_CLOUDFLARE_TUNNEL_TOKEN>
+sudo systemctl enable cloudflared
+sudo systemctl start cloudflared
+```
+To check status:
+```bash
+sudo systemctl status cloudflared
+```
+
+---
+
+### Manual Method D: Manual Docker Run (Single Command)
+If you prefer not to install `cloudflared` on the host system, run it as a standalone container:
+```bash
+docker run --rm -it --network host cloudflare/cloudflared:latest tunnel --no-autoupdate run --token <YOUR_CLOUDFLARE_TUNNEL_TOKEN>
+```
+*(Using `--network host` connects the container directly to `http://localhost:3000` on your Linux host).*
+
+---
+
+### Manual Method E: Using `ngrok` (Alternative)
+```bash
+ngrok http 3000
+```
+
+---
+
 ## 3. Crucial Local Linux Host Optimization Checklist
 
 Running on a local Linux computer or laptop requires simple Linux systemd adjustments to prevent downtime:
