@@ -1,7 +1,7 @@
-# Local Computer + Cloud Tunnel Deployment Guide
-## Running the Database Learning Platform on a Local Computer / Homelab via Docker & Cloudflare Tunnel
+# Linux Docker + Cloud Tunnel Deployment Guide
+## Running the Database Learning Platform on a Local Linux Machine via Docker & Cloudflare Tunnel
 
-This guide explains how to run the production Docker stack on your **local computer (Windows desktop/laptop or Linux workstation)** and securely expose it to students and instructors worldwide via a **Cloud Tunnel** — with **no public IP, no router port forwarding, and automatic SSL/TLS encryption**.
+This guide explains how to run the production Docker stack on a **local Linux computer (Ubuntu, Debian, Fedora, Arch, or home Linux server)** and securely expose it to students and instructors worldwide via a **Cloud Tunnel** — with **no public IP, no router port forwarding, and automatic SSL/TLS encryption**.
 
 ---
 
@@ -12,7 +12,7 @@ flowchart LR
     Students["Students & Instructors<br/>(Internet)"]
     Cloudflare["Cloudflare Global Edge<br/>- Free HTTPS / SSL termination<br/>- DDoS & Bot Mitigation<br/>- Hides your home IP"]
     
-    subgraph LocalMachine["Your Local Computer / Docker Desktop"]
+    subgraph LinuxHost["Your Local Linux Machine (Docker Engine)"]
         Tunnel["cloudflared Container<br/>(Outbound encrypted tunnel)"]
         Web["Next.js Web Container<br/>(web:3000)"]
         AppDB[("PostgreSQL App DB<br/>(app_db)")]
@@ -26,42 +26,44 @@ flowchart LR
     Web --> SandboxDB
 ```
 
-### Why Cloudflare Tunnel for Local Hosting?
-* **Zero Router Configuration**: You do **not** need to open port 80 or 443 on your home Wi-Fi router.
+### Why Cloudflare Tunnel for Local Linux Hosting?
+* **Zero Router Configuration**: You do **not** need to open port 80 or 443 on your router or firewall.
 * **CGNAT Friendly**: Works even if your ISP uses Carrier-Grade NAT (CGNAT) where traditional port forwarding is impossible.
-* **Security & IP Privacy**: Your home or office public IP address is never revealed to the internet.
-* **Built-in Free SSL**: Cloudflare terminates HTTPS automatically at the edge with legitimate certificates trusted by all browsers.
+* **IP Privacy**: Your home or campus IP address is never revealed to the public internet.
+* **Built-in Free SSL**: Cloudflare terminates HTTPS automatically at the edge with valid certificates trusted by all browsers.
 
 ---
 
 ## 2. Quickstart: 5-Step Setup
 
 ### Step 1: Create a Free Cloudflare Account & Add a Domain
-1. Register a domain (e.g. at Namecheap, Cloudflare Registrar, etc.) or use an existing domain.
-2. In your Cloudflare Dashboard, add your domain and ensure its nameservers point to Cloudflare.
+1. In your Cloudflare Dashboard, add your domain and ensure its nameservers point to Cloudflare.
 
 ### Step 2: Create a Cloudflare Tunnel
 1. Go to the [Cloudflare Zero Trust Dashboard](https://one.dash.cloudflare.com/).
 2. In the left sidebar, navigate to **Networks** -> **Tunnels**.
 3. Click **Add a tunnel** -> Select **Cloudflared** -> Click **Next**.
-4. Name your tunnel (e.g., `db-platform-local`) and click **Save tunnel**.
-5. Under **Install and run a connector**, look at the commands shown. Copy the **Tunnel Token** (the long string following `--token`, starting with `eyJhIj...`).
+4. Name your tunnel (e.g. `db-platform-linux`) and click **Save tunnel**.
+5. Under **Install and run a connector**, copy the **Tunnel Token** (the string following `--token`, starting with `eyJhIj...`).
 
 ### Step 3: Configure the Public Hostname in Cloudflare
-In the same tunnel setup screen under the **Public Hostnames** tab:
+Under the **Public Hostnames** tab of the tunnel:
 * **Subdomain**: e.g. `analytics` (or leave blank for root domain)
 * **Domain**: `yourdomain.com` (select your domain from dropdown)
 * **Path**: leave empty
 * **Service Type**: `HTTP`
-* **URL**: `web:3000` *(matches the Docker service name and internal port)*
+* **URL**: `web:3000` *(matches the internal Docker service name)*
 * Click **Save hostname**.
 
 ### Step 4: Configure `.env.production`
 Copy `.env.production.example` to `.env.production` and paste your tunnel token:
+```bash
+cp .env.production.example .env.production
+```
+Edit `.env.production`:
 ```env
-# In .env.production
 APP_DOMAIN=analytics.yourdomain.com
-JWT_SECRET=replace_with_a_secure_random_64_char_hex_secret_key_in_production
+JWT_SECRET=generate_with_openssl_rand_hex_32
 POSTGRES_APP_PASSWORD=strong_app_db_pw_123
 POSTGRES_SANDBOX_PASSWORD=strong_sandbox_db_pw_123
 STUDENT_SANDBOX_PASSWORD=strong_student_sandbox_pw_123
@@ -71,126 +73,95 @@ CLOUDFLARE_TUNNEL_TOKEN=eyJhIjoi...
 ```
 
 ### Step 5: Launch the Tunnel Stack
-Run the following Docker Compose command:
+Run the Docker Compose command:
 
 ```bash
 docker compose -f docker-compose.prod.yml -f docker-compose.tunnel.yml --env-file .env.production up -d --build
 ```
 
 > [!TIP]
-> Notice that `docker-compose.tunnel.yml` automatically starts the `cloudflared` container and safely deactivates the local `caddy` service, because Cloudflare edge terminates HTTPS and routes traffic straight into `web:3000`.
+> `docker-compose.tunnel.yml` starts the `cloudflared` container and deactivates the local `caddy` service, because Cloudflare edge terminates HTTPS and routes traffic directly into `web:3000`.
 
 Open your browser and navigate to `https://analytics.yourdomain.com` — your platform is live!
 
 ---
 
-## 3. Crucial Local Computer & Host Optimization Checklist
+## 3. Crucial Local Linux Host Optimization Checklist
 
-Running a production service on a desktop or laptop requires specific OS and hardware settings to prevent downtime:
+Running on a local Linux computer or laptop requires simple Linux systemd adjustments to prevent downtime:
 
-### 1. Prevent Computer Sleep & Hibernation (P0 Essential)
-If your computer goes to sleep or hibernates, the tunnel and web server will disconnect immediately.
+### 1. Prevent Linux Sleep & Suspends (P0 Essential)
+If your Linux system suspends or sleeps, the tunnel and web app drop immediately.
 
-* **Windows 10 / 11**:
-  - Open **Settings** -> **System** -> **Power & battery**.
-  - Under **Screen and sleep**:
-    - "When plugged in, turn off my screen after": Any value (e.g., 10 minutes is fine).
-    - "When plugged in, put my device to sleep after": **Never**.
-* **Laptop Lid Setting (If using a laptop)**:
-  - Open **Control Panel** -> **Power Options**.
-  - Click **Choose what closing the lid does**.
-  - Under "When I close the lid" (Plugged in): Select **Do nothing**.
-* **Tool Recommendation**: Install **Microsoft PowerToys** from the Microsoft Store and enable the **PowerToys Awake** utility (set to "Keep awake indefinitely").
+* **Disable Suspend and Sleep in systemd**:
+  ```bash
+  sudo systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target
+  ```
+  *(To undo later if needed: `sudo systemctl unmask sleep.target suspend.target hibernate.target hybrid-sleep.target`)*
 
-### 2. Docker Desktop for Windows (WSL 2) Resource Tuning
-By default, WSL 2 can consume up to 50% or more of your total host RAM, which can make your local computer sluggish.
+* **If running on a Linux Laptop (Prevent Lid Close Sleep)**:
+  Edit `/etc/systemd/logind.conf`:
+  ```ini
+  HandleLidSwitch=ignore
+  HandleLidSwitchExternalPower=ignore
+  ```
+  Then restart `systemd-logind`:
+  ```bash
+  sudo systemctl restart systemd-logind
+  ```
 
-To allocate fixed resources for Docker:
-1. Open PowerShell and edit your global WSL config:
-   ```powershell
-   notepad "$env:USERPROFILE\.wslconfig"
-   ```
-2. Add the following configuration (adjust memory to 50% of your system RAM, e.g., 6GB or 8GB):
-   ```ini
-   [wsl2]
-   memory=6GB
-   processors=4
-   swap=2GB
-   ```
-3. Restart WSL in PowerShell:
-   ```powershell
-   wsl --shutdown
-   ```
-4. In Docker Desktop Settings:
-   - Check: **Start Docker Desktop when you sign in to your computer**.
+### 2. Ensure Docker Starts Automatically on Linux Boot
+Ensure Docker daemon starts automatically whenever the Linux computer turns on or reboots:
+```bash
+sudo systemctl enable docker
+sudo systemctl start docker
+```
+Because all services in `docker-compose.prod.yml` and `docker-compose.tunnel.yml` have `restart: unless-stopped` or `restart: always`, all database, web, and tunnel containers will automatically launch on system boot.
 
-### 3. Windows Update Automatic Reboots
-Windows Update may attempt to restart your computer overnight:
-- Open **Settings** -> **Windows Update** -> **Advanced options**.
-- Set **Active hours** to cover your class and exam schedules (e.g. 7:00 AM to 11:00 PM).
-- Note: All containers in `docker-compose.prod.yml` and `docker-compose.tunnel.yml` have `restart: unless-stopped` or `restart: always`. If your machine does restart, Docker Desktop will automatically boot your databases, web server, and tunnel as soon as you log in.
-
-### 4. Reliable Internet & Wired Connection
-- Prefer a wired **Ethernet cable** over Wi-Fi for your local host machine to eliminate Wi-Fi latency jitter during simultaneous student exam submissions.
-- Keep the computer plugged into AC power (do not run production on laptop battery power).
+### 3. Reliable Network Connection
+- Plug your Linux machine into a wired **Ethernet cable** rather than Wi-Fi to eliminate packet drops and latency spikes during simultaneous student submissions.
 
 ---
 
-## 4. Offsite Backup Strategy for Local Hosts
+## 4. Automated Backups & Maintenance on Linux
 
-When running on a local computer, hard drive crashes or Windows reinstalls can wipe student data. To safeguard submissions:
+Everything is fully automated using standard Linux tools:
 
-### Option A: Sync Backups to OneDrive / Google Drive / Dropbox
-The automated backup script can dump database snapshots directly into your cloud-synced local folder.
-
-Create a simple PowerShell scheduled script `docker/backup-local.ps1`:
-```powershell
-# Path to your cloud sync folder (e.g., OneDrive or Google Drive)
-$BACKUP_DIR = "$env:USERPROFILE\OneDrive\DB_Platform_Backups"
-New-Item -ItemType Directory -Force -Path $BACKUP_DIR | Out-Null
-
-$TIMESTAMP = Get-Date -Format "yyyyMMdd_HHmmss"
-$APP_BACKUP = "$BACKUP_DIR\app_db_$TIMESTAMP.sql.gz"
-
-Write-Host "Backing up app_db to $APP_BACKUP..."
-docker exec -t db_platform_postgres_app pg_dump -U postgres -d app_db --clean --if-exists | gzip > $APP_BACKUP
-
-Write-Host "Backup complete. Cloud drive will automatically sync to cloud."
+### Install Nightly Backups & Weekly Docker Pruning
+Run the included cron installer:
+```bash
+chmod +x ./docker/*.sh
+./docker/setup-cron.sh
 ```
 
-### Option B: Remote S3 / Cloudflare R2 Upload
-Set `S3_BUCKET` in `.env.production` — the included [docker/backup.sh](file:///c:/Users/stone-laptop/Documents/db_for_business_analytics/docker/backup.sh) script will automatically push daily compressed snapshots to AWS S3 or Cloudflare R2.
+This schedules:
+* **Nightly at 02:00 AM**: `docker/backup.sh` creates timestamped gzip dumps of `app_db` and `sandbox_db` in `/var/backups/db-platform` with 30-day automatic retention.
+* **Weekly at 03:00 AM (Sunday)**: `docker/prune.sh` cleans stale Docker containers, dangling images, and build caches to prevent local disk exhaustion.
+
+### Optional: Offsite Backup to AWS S3 or Cloudflare R2
+If you set `S3_BUCKET` in `.env.production`:
+```env
+S3_BUCKET=my-university-analytics-backups
+```
+`docker/backup.sh` will automatically sync compressed backups offsite to S3/R2 after every local dump.
 
 ---
 
-## 5. Alternative Tunnel Solutions
+## 5. Verification & Health Monitoring
 
-If you don't have a custom domain or want instant temporary sharing:
-
-| Solution | Command | Best For | Cost |
-| :--- | :--- | :--- | :--- |
-| **Cloudflare Tunnel** *(Recommended)* | `docker-compose.tunnel.yml` | Permanent university production, custom domain, auto-SSL, DDoS shield | **Free** |
-| **ngrok** | `ngrok http 3000` | Quick 1-hour testing / demos with colleagues | Free tier has ephemeral URLs |
-| **Tailscale Funnel** | `tailscale funnel 3000` | Exposing to internet via your private Tailscale node | Free |
-| **Bore** | `bore local 3000 --to bore.pub` | Lightweight open-source public TCP tunnel | Free |
-
----
-
-## 6. Verification & Monitoring
-
-Once your local stack and tunnel are running:
+Once your Linux stack and tunnel are running:
 
 1. **Check Tunnel Connection**:
    ```bash
    docker logs -f db_platform_tunnel
    ```
-   You should see: `Connection established to Cloudflare edge server... Registered tunnel connection`.
+   You should see: `Registered tunnel connection ... Connection established to Cloudflare edge server`.
 
-2. **Verify Public Healthcheck**:
+2. **Verify Public Endpoint**:
    ```bash
-   curl https://analytics.yourdomain.com/api/health
+   curl -s https://analytics.yourdomain.com/api/health
    ```
-   Expected response:
+   Expected output:
    ```json
    {
      "status": "healthy",
@@ -203,7 +174,7 @@ Once your local stack and tunnel are running:
    }
    ```
 
-3. **Check Container Status**:
+3. **Check Running Containers**:
    ```bash
    docker compose -f docker-compose.prod.yml -f docker-compose.tunnel.yml ps
    ```
