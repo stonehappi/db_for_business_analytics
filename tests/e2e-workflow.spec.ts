@@ -255,4 +255,70 @@ test.describe('Database Learning Platform & Project Management E2E', () => {
     expect(dataTimeout.error).toContain('statement timeout limit');
   });
 
+  test('8. Multi-Course & Multi-Semester Class Management: Teacher creates Master Course, creates semester class sections, and switches between courses and classes', async ({ page }) => {
+    await loginAs(page, 'prof.smith@uni.edu');
+
+    // 1. Verify Course and Class dropdowns are present
+    const courseSelector = page.locator('[data-testid="course-selector"]');
+    const classSelector = page.locator('[data-testid="class-selector"]');
+    await expect(courseSelector).toBeVisible();
+    await expect(classSelector).toBeVisible();
+
+    // Verify existing courses seeded: BA-101, BA-201, BA-301
+    await expect(courseSelector.locator('option')).toContainText(['[BA-101]', '[BA-201]', '[BA-301]']);
+
+    // 2. Switch to BA-201 Data Warehousing
+    const ba201Val = await courseSelector.locator('option', { hasText: 'BA-201' }).getAttribute('value');
+    await courseSelector.selectOption(ba201Val!);
+
+    // Verify classes for BA-201 are loaded in class selector
+    await expect(classSelector).toContainText('DW-2026-FALL-A');
+
+    // 3. Switch back to BA-101 Relational DB Design
+    const ba101Val = await courseSelector.locator('option', { hasText: 'BA-101' }).getAttribute('value');
+    await courseSelector.selectOption(ba101Val!);
+    await expect(classSelector).toContainText('BA-2026-FALL-A');
+    await expect(classSelector).toContainText('BA-2026-FALL-B');
+    await expect(classSelector).toContainText('BA-2027-SPRING-A');
+
+    // Switch between semester cohorts within BA-101
+    const fallBVal = await classSelector.locator('option', { hasText: 'BA-2026-FALL-B' }).getAttribute('value');
+    await classSelector.selectOption(fallBVal!);
+    await expect(classSelector).toHaveValue(fallBVal!);
+    await expect(page.getByText('(BA-2026-FALL-B)')).toBeVisible({ timeout: 5000 });
+
+    // 4. Create a new Master Course (e.g. BA-401 Big Data Lakehouse)
+    const newCourseBtn = page.locator('[data-testid="new-course-btn"]');
+    await expect(newCourseBtn).toBeVisible();
+    await newCourseBtn.click();
+
+    await expect(page.locator('[data-testid="create-course-modal"]')).toBeVisible();
+    const courseCode = `BA-401-${Date.now().toString().slice(-4)}`;
+    await page.fill('[data-testid="course-code-input"]', courseCode);
+    await page.fill('[data-testid="course-title-input"]', 'Enterprise Data Lakehouses & BI');
+    await page.fill('[data-testid="course-desc-input"]', 'Distributed architectures, Spark SQL, and Delta lake analytics.');
+    await page.click('[data-testid="submit-course-btn"]');
+
+    // Verify newly created course is automatically selected
+    await expect(page.locator('[data-testid="create-course-modal"]')).not.toBeVisible();
+    await expect(courseSelector).toContainText(courseCode);
+
+    // 5. Add a Semester Class Section for the newly created course
+    const newClassBtn = page.locator('[data-testid="new-class-btn"]');
+    await expect(newClassBtn).toBeVisible();
+    await newClassBtn.click();
+
+    await expect(page.locator('[data-testid="create-class-modal"]')).toBeVisible();
+    const classCode = `${courseCode}-FALL-A`;
+    await page.selectOption('[data-testid="class-term-input"]', 'Fall 2026');
+    await page.fill('[data-testid="class-code-input"]', classCode);
+    await page.fill('[data-testid="class-name-input"]', 'Fall 2026 Lakehouse Alpha Cohort');
+    await page.click('[data-testid="submit-class-btn"]');
+
+    // Verify newly created class is selected in navigation
+    await expect(page.locator('[data-testid="create-class-modal"]')).not.toBeVisible();
+    await expect(classSelector).toContainText(classCode);
+    await expect(page.getByText(`(${classCode})`)).toBeVisible({ timeout: 5000 });
+  });
+
 });

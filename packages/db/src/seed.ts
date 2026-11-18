@@ -77,18 +77,105 @@ export async function runSeed() {
       `, [u.id, u.studentIdCode, u.email, defaultPasswordHash, u.fullName, u.role]);
     }
 
-    // 2. Seed Cohort
-    console.log('[SEED] Seeding cohort...');
-    const cohortId = 'a1b2c3d4-0000-1111-2222-333333333333';
-    await client.query(`
-      INSERT INTO cohorts (id, code, name, teacher_id, term, status)
-      VALUES ($1, $2, $3, $4, $5, 'active')
-      ON CONFLICT (id) DO UPDATE SET
-        code = EXCLUDED.code,
-        name = EXCLUDED.name,
-        teacher_id = EXCLUDED.teacher_id,
-        term = EXCLUDED.term;
-    `, [cohortId, 'BA-2026-FALL-A', 'Business Analytics Fall 2026 - Section A', '00000000-0000-0000-0000-000000000001', 'Fall 2026']);
+    // 2. Seed Master Courses (Teacher has many Master Courses)
+    console.log('[SEED] Seeding master courses...');
+    const teacherId = '00000000-0000-0000-0000-000000000001';
+    const courses = [
+      {
+        id: '11111111-0000-0000-0000-000000000001',
+        code: 'BA-101',
+        title: 'Relational Database Design & SQL for Business Analytics',
+        description: 'Comprehensive 16-week foundational curriculum covering conceptual ERDs, 3NF normalization, and analytical SQL reporting.',
+        teacherId: teacherId,
+      },
+      {
+        id: '11111111-0000-0000-0000-000000000002',
+        code: 'BA-201',
+        title: 'Data Warehousing & Dimensional BI Modeling',
+        description: 'Dimensional modeling, star and snowflake schemas, slowly changing dimensions (SCD Type 2), and reporting marts.',
+        teacherId: teacherId,
+      },
+      {
+        id: '11111111-0000-0000-0000-000000000003',
+        code: 'BA-301',
+        title: 'Advanced Analytical SQL & Real-Time Performance',
+        description: 'Analytical window functions, cohort retention waterfalls, recursive CTEs, and PostgreSQL performance tuning.',
+        teacherId: teacherId,
+      },
+    ];
+
+    for (const c of courses) {
+      await client.query(`
+        INSERT INTO master_courses (id, code, title, description, teacher_id)
+        VALUES ($1, $2, $3, $4, $5)
+        ON CONFLICT (id) DO UPDATE SET
+          code = EXCLUDED.code,
+          title = EXCLUDED.title,
+          description = EXCLUDED.description,
+          teacher_id = EXCLUDED.teacher_id;
+      `, [c.id, c.code, c.title, c.description, c.teacherId]);
+    }
+
+    // 3. Seed Cohorts / Classes (Each Course has many Classes each Semester / Term)
+    console.log('[SEED] Seeding classes across semesters...');
+    const defaultCohortId = 'a1b2c3d4-0000-1111-2222-333333333333';
+    const cohortId = defaultCohortId;
+    const cohorts = [
+      {
+        id: defaultCohortId,
+        courseId: '11111111-0000-0000-0000-000000000001', // BA-101
+        code: 'BA-2026-FALL-A',
+        name: 'BA-101 Section A (Morning)',
+        term: 'Fall 2026',
+        status: 'active',
+      },
+      {
+        id: 'a1b2c3d4-0000-1111-2222-444444444444',
+        courseId: '11111111-0000-0000-0000-000000000001', // BA-101
+        code: 'BA-2026-FALL-B',
+        name: 'BA-101 Section B (Evening)',
+        term: 'Fall 2026',
+        status: 'active',
+      },
+      {
+        id: 'a1b2c3d4-0000-1111-2222-555555555555',
+        courseId: '11111111-0000-0000-0000-000000000001', // BA-101
+        code: 'BA-2027-SPRING-A',
+        name: 'BA-101 Section A (Spring)',
+        term: 'Spring 2027',
+        status: 'upcoming',
+      },
+      {
+        id: 'a1b2c3d4-0000-1111-2222-666666666666',
+        courseId: '11111111-0000-0000-0000-000000000002', // BA-201
+        code: 'DW-2026-FALL-A',
+        name: 'BA-201 Data Warehouse Section',
+        term: 'Fall 2026',
+        status: 'active',
+      },
+      {
+        id: 'a1b2c3d4-0000-1111-2222-777777777777',
+        courseId: '11111111-0000-0000-0000-000000000003', // BA-301
+        code: 'SQL-2026-FALL-A',
+        name: 'BA-301 Advanced Analytics Lab',
+        term: 'Fall 2026',
+        status: 'active',
+      },
+    ];
+
+    for (const ch of cohorts) {
+      await client.query(`
+        INSERT INTO cohorts (id, course_id, code, name, teacher_id, term, status)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        ON CONFLICT (id) DO UPDATE SET
+          course_id = EXCLUDED.course_id,
+          code = EXCLUDED.code,
+          name = EXCLUDED.name,
+          teacher_id = EXCLUDED.teacher_id,
+          term = EXCLUDED.term,
+          status = EXCLUDED.status;
+      `, [ch.id, ch.courseId, ch.code, ch.name, teacherId, ch.term, ch.status]);
+    }
 
     // Cohort Enrollments
     for (const u of users.filter(usr => usr.role === 'student')) {
@@ -96,11 +183,19 @@ export async function runSeed() {
         INSERT INTO cohort_enrollments (cohort_id, student_id)
         VALUES ($1, $2)
         ON CONFLICT (cohort_id, student_id) DO NOTHING;
-      `, [cohortId, u.id]);
+      `, [defaultCohortId, u.id]);
+
+      // Enroll some students into Section B and DW course as well
+      await client.query(`
+        INSERT INTO cohort_enrollments (cohort_id, student_id)
+        VALUES ($1, $2)
+        ON CONFLICT (cohort_id, student_id) DO NOTHING;
+      `, ['a1b2c3d4-0000-1111-2222-666666666666', u.id]);
     }
 
-    // 3. Seed 16-Week Master Modules
-    console.log('[SEED] Seeding 16-week master modules...');
+    // 4. Seed 16-Week Master Modules
+    console.log('[SEED] Seeding 16-week master modules for BA-101...');
+    const ba101CourseId = '11111111-0000-0000-0000-000000000001';
     const modules = [
       { num: 1, title: 'Week 1: Business Reality to Relational Abstraction', slug: 'w1-business-reality-relational-abstraction', desc: 'Entities vs attributes, candidate keys, surrogate vs natural keys' },
       { num: 2, title: 'Week 2: Relational Cardinality & One-to-Many Relationships', slug: 'w2-cardinality-one-to-many', desc: 'Parent-child hierarchies, 1:M relationships, Crow\'s Foot notation' },
@@ -124,16 +219,33 @@ export async function runSeed() {
 
     for (const m of modules) {
       const res = await client.query(`
-        INSERT INTO master_modules (title, slug, description, week_number, sort_order)
-        VALUES ($1, $2, $3, $4, $5)
+        INSERT INTO master_modules (course_id, title, slug, description, week_number, sort_order)
+        VALUES ($1, $2, $3, $4, $5, $6)
         ON CONFLICT (slug) DO UPDATE SET
+          course_id = EXCLUDED.course_id,
           title = EXCLUDED.title,
           description = EXCLUDED.description,
           week_number = EXCLUDED.week_number,
           sort_order = EXCLUDED.sort_order
         RETURNING id;
-      `, [m.title, m.slug, m.desc, m.num, m.num]);
+      `, [ba101CourseId, m.title, m.slug, m.desc, m.num, m.num]);
       moduleMap[m.num] = res.rows[0].id;
+    }
+
+    // Seed modules for BA-201 (Data Warehousing)
+    const dwModules = [
+      { num: 1, title: 'Module 1: Dimensional Modeling & Fact Table Grain', slug: 'dw-m1-dimensional-modeling', desc: 'Kimball dimensional lifecycle, fact tables vs dimension tables' },
+      { num: 2, title: 'Module 2: Slowly Changing Dimensions & Star Schemas', slug: 'dw-m2-scd-star-schemas', desc: 'Type 1, Type 2, Type 3 SCDs and Kimball conformities' },
+    ];
+    for (const dm of dwModules) {
+      await client.query(`
+        INSERT INTO master_modules (course_id, title, slug, description, week_number, sort_order)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        ON CONFLICT (slug) DO UPDATE SET
+          course_id = EXCLUDED.course_id,
+          title = EXCLUDED.title,
+          description = EXCLUDED.description;
+      `, ['11111111-0000-0000-0000-000000000002', dm.title, dm.slug, dm.desc, dm.num, dm.num]);
     }
 
     // 4. Seed Master Assignments

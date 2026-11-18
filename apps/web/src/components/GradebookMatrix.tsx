@@ -134,11 +134,16 @@ export default function GradebookMatrix({
         <div className="flex items-center space-x-3">
           <div>
             <div className="text-xs font-semibold text-ink flex items-center space-x-2">
+              {cohort?.course_code && (
+                <span className="px-1.5 py-0.5 rounded bg-subtle text-[10px] font-mono border border-border">
+                  [{cohort.course_code}]
+                </span>
+              )}
               <span>{cohort?.name}</span>
-              <span className="font-mono text-ink-secondary">({cohort?.code})</span>
+              <span className="font-mono text-ink-secondary text-[11px]">({cohort?.code})</span>
             </div>
             <div className="text-[11px] text-ink-secondary">
-              Term: {cohort?.term} • {students.length} Enrolled Students
+              {cohort?.course_title ? `${cohort.course_title} • ` : ''}Semester: {cohort?.term} • {students.length} Enrolled Students
             </div>
           </div>
 

@@ -11,8 +11,9 @@ export async function GET(
     // 1. Cohort details
     const cohortRes = await queryApp(
       `
-      SELECT c.*, u.full_name AS teacher_name, u.email AS teacher_email
+      SELECT c.*, mc.code AS course_code, mc.title AS course_title, u.full_name AS teacher_name, u.email AS teacher_email
       FROM cohorts c
+      LEFT JOIN master_courses mc ON c.course_id = mc.id
       JOIN users u ON c.teacher_id = u.id
       WHERE c.id = $1;
     `,

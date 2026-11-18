@@ -1,13 +1,30 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { queryApp } from '@db-platform/db';
+import { getSessionUser } from '@/lib/auth';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const modulesRes = await queryApp(`
-      SELECT id, title, slug, description, week_number, sort_order
-      FROM master_modules
-      ORDER BY sort_order ASC;
-    `);
+    const url = new URL(req.url);
+    const courseId = url.searchParams.get('courseId');
+
+    let modulesRes;
+    if (courseId) {
+      modulesRes = await queryApp(
+        `
+        SELECT id, course_id, title, slug, description, week_number, sort_order
+        FROM master_modules
+        WHERE course_id = $1
+        ORDER BY sort_order ASC;
+        `,
+        [courseId]
+      );
+    } else {
+      modulesRes = await queryApp(`
+        SELECT id, course_id, title, slug, description, week_number, sort_order
+        FROM master_modules
+        ORDER BY sort_order ASC;
+      `);
+    }
 
     const assignmentsRes = await queryApp(`
       SELECT id, module_id, title, slug, type, business_case_markdown, starter_sql, solution_sql, verification_sql, max_score, weight_percentage, rubric_criteria, sort_order
@@ -17,6 +34,7 @@ export async function GET() {
 
     const modules = modulesRes.rows.map((m: any) => ({
       id: m.id,
+      courseId: m.course_id,
       title: m.title,
       slug: m.slug,
       description: m.description,
@@ -41,6 +59,41 @@ export async function GET() {
     }));
 
     return NextResponse.json(modules);
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const user = await getSessionUser(req);
+    if (!user || (user.role !== 'teacher' && user.role !== 'admin')) {
+      return NextResponse.json(
+        { error: 'Forbidden: Only teachers can create master modules' },
+        { status: 403 }
+      );
+    }
+
+    const body = await req.json();
+    const { courseId, title, slug, description, weekNumber, sortOrder } = body;
+
+    if (!courseId || !title || !slug) {
+      return NextResponse.json(
+        { error: 'courseId, title, and slug are required' },
+        { status: 400 }
+      );
+    }
+
+    const res = await queryApp(
+      `
+      INSERT INTO master_modules (course_id, title, slug, description, week_number, sort_order)
+      VALUES ($1, $2, $3, $4, $5, $6)
+      RETURNING *;
+      `,
+      [courseId, title, slug, description || '', weekNumber || 1, sortOrder || 1]
+    );
+
+    return NextResponse.json(res.rows[0], { status: 201 });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }

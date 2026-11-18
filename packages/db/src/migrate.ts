@@ -61,10 +61,26 @@ export async function runMigrations() {
       CREATE INDEX IF NOT EXISTS idx_users_student_code ON users(student_id_code);
     `);
 
-    // 2. Cohorts table
+    // 2. Master Courses table (Teacher has many Master Courses)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS master_courses (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        code VARCHAR(50) UNIQUE NOT NULL,
+        title VARCHAR(255) NOT NULL,
+        description TEXT,
+        teacher_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_master_courses_teacher ON master_courses(teacher_id);
+      CREATE INDEX IF NOT EXISTS idx_master_courses_code ON master_courses(code);
+    `);
+
+    // 3. Cohorts / Classes table (Each Course has many Classes each Semester / Term)
     await client.query(`
       CREATE TABLE IF NOT EXISTS cohorts (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        course_id UUID REFERENCES master_courses(id) ON DELETE CASCADE,
         code VARCHAR(50) UNIQUE NOT NULL,
         name VARCHAR(255) NOT NULL,
         teacher_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
@@ -74,6 +90,8 @@ export async function runMigrations() {
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
+      ALTER TABLE cohorts ADD COLUMN IF NOT EXISTS course_id UUID REFERENCES master_courses(id) ON DELETE CASCADE;
+      CREATE INDEX IF NOT EXISTS idx_cohorts_course ON cohorts(course_id);
       CREATE INDEX IF NOT EXISTS idx_cohorts_teacher ON cohorts(teacher_id);
       CREATE INDEX IF NOT EXISTS idx_cohorts_code ON cohorts(code);
     `);
@@ -91,10 +109,11 @@ export async function runMigrations() {
       CREATE INDEX IF NOT EXISTS idx_enrollments_student ON cohort_enrollments(student_id);
     `);
 
-    // 3. Master Modules
+    // 4. Master Modules (Belongs to a specific Master Course)
     await client.query(`
       CREATE TABLE IF NOT EXISTS master_modules (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        course_id UUID REFERENCES master_courses(id) ON DELETE CASCADE,
         title VARCHAR(255) NOT NULL,
         slug VARCHAR(255) UNIQUE NOT NULL,
         description TEXT,
@@ -103,6 +122,8 @@ export async function runMigrations() {
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
+      ALTER TABLE master_modules ADD COLUMN IF NOT EXISTS course_id UUID REFERENCES master_courses(id) ON DELETE CASCADE;
+      CREATE INDEX IF NOT EXISTS idx_master_modules_course ON master_modules(course_id);
       CREATE INDEX IF NOT EXISTS idx_master_modules_sort ON master_modules(sort_order);
     `);
 
@@ -180,6 +201,7 @@ export async function runMigrations() {
     `);
 
     // SQL View: vw_cohort_final_gradebook
+    await client.query(`DROP VIEW IF EXISTS vw_cohort_final_gradebook CASCADE;`);
     await client.query(`
       CREATE OR REPLACE VIEW vw_cohort_final_gradebook AS
       WITH latest_submissions AS (
@@ -196,6 +218,9 @@ export async function runMigrations() {
       student_assignment_scores AS (
           SELECT
               ce.cohort_id,
+              c.course_id,
+              mc.code AS course_code,
+              mc.title AS course_title,
               c.code AS cohort_code,
               c.name AS cohort_name,
               c.term,
@@ -220,6 +245,7 @@ export async function runMigrations() {
               ls.graded_at
           FROM cohort_enrollments ce
           JOIN cohorts c ON ce.cohort_id = c.id
+          LEFT JOIN master_courses mc ON c.course_id = mc.id
           JOIN users u ON ce.student_id = u.id
           JOIN cohort_assignments ca ON ca.cohort_id = c.id AND ca.is_published = TRUE
           JOIN master_assignments ma ON ca.master_assignment_id = ma.id
@@ -228,6 +254,9 @@ export async function runMigrations() {
       )
       SELECT
           cohort_id,
+          course_id,
+          course_code,
+          course_title,
           cohort_code,
           cohort_name,
           term,
@@ -261,7 +290,7 @@ export async function runMigrations() {
           END AS letter_grade
       FROM student_assignment_scores
       GROUP BY
-          cohort_id, cohort_code, cohort_name, term,
+          cohort_id, course_id, course_code, course_title, cohort_code, cohort_name, term,
           student_uuid, student_id_code, student_name, student_email;
     `);
 

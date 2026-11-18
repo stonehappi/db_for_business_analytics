@@ -13,30 +13,41 @@ import {
   Plus,
 } from 'lucide-react';
 
+import { CohortClass } from './Navigation';
+
 interface CurriculumViewProps {
   cohortId: string;
+  courseId?: string;
+  classes?: CohortClass[];
 }
 
-export default function CurriculumView({ cohortId }: CurriculumViewProps) {
+export default function CurriculumView({ cohortId, courseId, classes = [] }: CurriculumViewProps) {
   const [modules, setModules] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [selectedAssignment, setSelectedAssignment] = useState<any>(null);
   const [publishModalAssignment, setPublishModalAssignment] = useState<any>(null);
+  const [targetCohortId, setTargetCohortId] = useState<string>(cohortId);
   const [dueDate, setDueDate] = useState<string>('2026-12-15T23:59');
   const [weightOverride, setWeightOverride] = useState<number | ''>('');
   const [publishSuccess, setPublishSuccess] = useState<boolean>(false);
 
+  useEffect(() => {
+    if (cohortId) {
+      setTargetCohortId(cohortId);
+    }
+  }, [cohortId]);
+
   const fetchModules = async () => {
     try {
-      const res = await fetch('/api/master/modules');
+      const url = courseId ? `/api/master/modules?courseId=${courseId}` : '/api/master/modules';
+      const res = await fetch(url);
       const data = await res.json();
       setModules(data);
-      if (data.length > 0 && data[0].assignments.length > 0) {
+      if (data.length > 0 && data[0].assignments?.length > 0) {
         setSelectedAssignment(data[0].assignments[0]);
       } else {
-        // Find first module with assignment
         const firstWithAssign = data.find((m: any) => m.assignments?.length > 0);
-        if (firstWithAssign) setSelectedAssignment(firstWithAssign.assignments[0]);
+        setSelectedAssignment(firstWithAssign ? firstWithAssign.assignments[0] : null);
       }
     } catch (err) {
       console.error(err);
@@ -47,12 +58,13 @@ export default function CurriculumView({ cohortId }: CurriculumViewProps) {
 
   useEffect(() => {
     fetchModules();
-  }, []);
+  }, [courseId]);
 
   const handlePublish = async () => {
     if (!publishModalAssignment) return;
+    const destCohortId = targetCohortId || cohortId;
     try {
-      await fetch(`/api/cohorts/${cohortId}/publish`, {
+      await fetch(`/api/cohorts/${destCohortId}/publish`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -254,15 +266,34 @@ export default function CurriculumView({ cohortId }: CurriculumViewProps) {
             <div className="flex items-center space-x-2">
               <Send className="w-4 h-4 text-ink" />
               <h3 className="text-sm font-semibold text-ink">
-                Publish to Cohort {cohortId ? 'BA-2026-FALL-A' : ''}
+                Publish Assignment to Class
               </h3>
             </div>
 
             <div className="text-xs text-ink-secondary">
-              Deploying <span className="font-semibold text-ink">{publishModalAssignment.title}</span> to the active class section.
+              Deploying <span className="font-semibold text-ink">{publishModalAssignment.title}</span> to the selected cohort.
             </div>
 
             <div className="space-y-3">
+              {classes.length > 0 && (
+                <div>
+                  <label className="block text-xs font-medium text-ink mb-1">
+                    Target Class / Semester Cohort
+                  </label>
+                  <select
+                    value={targetCohortId}
+                    onChange={(e) => setTargetCohortId(e.target.value)}
+                    className="w-full px-2.5 py-1.5 bg-white border border-border rounded text-xs font-mono text-ink focus:outline-none focus:border-border-strong cursor-pointer"
+                  >
+                    {classes.map((cls) => (
+                      <option key={cls.id} value={cls.id}>
+                        {cls.code} - {cls.name} ({cls.term})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-medium text-ink mb-1">
                   Submission Deadline (Due Date)
