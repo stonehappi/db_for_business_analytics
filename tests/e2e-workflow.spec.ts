@@ -321,4 +321,49 @@ test.describe('Database Learning Platform & Project Management E2E', () => {
     await expect(page.getByText(`(${classCode})`)).toBeVisible({ timeout: 5000 });
   });
 
+  test('9. Slide bar navigation & management: collapsible sidebar, course management modal, and class management modal', async ({ page }) => {
+    await loginAs(page, 'prof.smith@uni.edu');
+
+    // 1. Verify sidebar is visible
+    const sidebar = page.locator('[data-testid="sidebar-navigation"]');
+    await expect(sidebar).toBeVisible();
+
+    // 2. Test collapse and expand of slide bar
+    const toggleBtn = page.locator('[data-testid="toggle-sidebar-btn"]');
+    await expect(toggleBtn).toBeVisible();
+    await toggleBtn.click();
+
+    // When collapsed, check class on sidebar has w-16
+    await expect(sidebar).toHaveClass(/w-16/);
+
+    // Expand sidebar back
+    await toggleBtn.click();
+    await expect(sidebar).toHaveClass(/w-64/);
+
+    // 3. Test Master Course Management Modal
+    const manageCoursesBtn = page.locator('[data-testid="btn-manage-courses"]');
+    await expect(manageCoursesBtn).toBeVisible();
+    await manageCoursesBtn.click();
+
+    const courseMgmtModal = page.locator('[data-testid="course-management-modal"]');
+    await expect(courseMgmtModal).toBeVisible();
+    await expect(courseMgmtModal.locator('text=Master Course Management')).toBeVisible();
+    await expect(courseMgmtModal.locator('td >> text=BA-101')).toBeVisible();
+    await expect(courseMgmtModal.locator('td >> text=BA-201')).toBeVisible();
+    await courseMgmtModal.locator('button:has-text("Close")').click();
+    await expect(courseMgmtModal).not.toBeVisible();
+
+    // 4. Test Class & Semester Sections Management Modal
+    const manageClassesBtn = page.locator('[data-testid="btn-manage-classes"]');
+    await expect(manageClassesBtn).toBeVisible();
+    await manageClassesBtn.click();
+
+    const classMgmtModal = page.locator('[data-testid="class-management-modal"]');
+    await expect(classMgmtModal).toBeVisible();
+    await expect(classMgmtModal.locator('text=Class Sections & Semesters Management')).toBeVisible();
+    await expect(classMgmtModal.locator('td >> text=BA-2026-FALL-A')).toBeVisible();
+    await classMgmtModal.locator('button:has-text("Close")').click();
+    await expect(classMgmtModal).not.toBeVisible();
+  });
+
 });

@@ -30,6 +30,7 @@ export interface Course {
   teacher_id: string;
   class_count?: number;
   module_count?: number;
+  student_count?: number;
 }
 
 export interface CohortClass {
@@ -41,6 +42,8 @@ export interface CohortClass {
   status: string;
   course_code?: string;
   course_title?: string;
+  student_count?: number;
+  assignment_count?: number;
 }
 
 interface NavigationProps {
