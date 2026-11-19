@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
     }
 
     const assignmentsRes = await queryApp(`
-      SELECT id, module_id, title, slug, type, business_case_markdown, starter_sql, solution_sql, verification_sql, max_score, weight_percentage, rubric_criteria, sort_order
+      SELECT id, module_id, title, slug, type, language, business_case_markdown, starter_sql, solution_sql, verification_sql, starter_python, solution_python, verification_python, dataset_config, max_score, weight_percentage, rubric_criteria, sort_order
       FROM master_assignments
       ORDER BY sort_order ASC;
     `);
@@ -49,10 +49,15 @@ export async function GET(req: NextRequest) {
           title: a.title,
           slug: a.slug,
           type: a.type,
+          language: a.language || 'sql',
           businessCaseMarkdown: a.business_case_markdown,
           starterSql: a.starter_sql,
           solutionSql: a.solution_sql,
           verificationSql: a.verification_sql,
+          starterPython: a.starter_python,
+          solutionPython: a.solution_python,
+          verificationPython: a.verification_python,
+          datasetConfig: a.dataset_config,
           maxScore: Number(a.max_score),
           weightPercentage: Number(a.weight_percentage),
           rubricCriteria: a.rubric_criteria,

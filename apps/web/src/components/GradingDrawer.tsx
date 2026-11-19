@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X, Check, Save, FileCode, CheckCircle, AlertTriangle } from 'lucide-react';
+import { X, Check, Save, FileCode, CheckCircle, AlertTriangle, Image as ImageIcon, Table as TableIcon } from 'lucide-react';
 
 interface GradingDrawerProps {
   submissionData: any;
@@ -28,6 +28,19 @@ export default function GradingDrawer({
 
   if (!submissionData) return null;
 
+  const isPython = submissionData.language === 'python' || !!submissionData.submitted_python;
+  const submittedCode = isPython
+    ? (submissionData.submitted_python || submissionData.submitted_sql || '-- No Python code submitted')
+    : (submissionData.submitted_sql || '-- No SQL submission found');
+
+  const solutionCode = isPython
+    ? (submissionData.solution_python || submissionData.solution_sql)
+    : submissionData.solution_sql;
+
+  const artifacts = submissionData.execution_artifacts || submissionData.execution_output;
+  const plots = artifacts?.plots || [];
+  const tables = artifacts?.tables || [];
+
   const handleSave = async () => {
     if (isSaving) return;
     setIsSaving(true);
@@ -47,7 +60,7 @@ export default function GradingDrawer({
       {/* Backdrop for mobile */}
       <div className="fixed inset-0 bg-black/40 backdrop-blur-xs z-40 sm:hidden" onClick={onClose} />
 
-      <div className="fixed inset-y-0 right-0 w-full sm:w-[520px] md:w-[580px] max-w-full bg-surface border-l border-border shadow-2xl z-50 flex flex-col font-sans select-none animate-in slide-in-from-right duration-150">
+      <div className="fixed inset-y-0 right-0 w-full sm:w-[520px] md:w-[600px] max-w-full bg-surface border-l border-border shadow-2xl z-50 flex flex-col font-sans select-none animate-in slide-in-from-right duration-150">
       {/* Drawer Header */}
       <div className="h-14 px-4 border-b border-border bg-subtle/50 flex items-center justify-between">
         <div>
@@ -74,10 +87,10 @@ export default function GradingDrawer({
       {/* Drawer Body */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 text-xs">
         {/* Score & Status Summary */}
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-4 gap-2">
           <div className="p-2.5 bg-subtle border border-border rounded">
             <span className="text-[10px] text-ink-secondary uppercase block">
-              Automated Score
+              Auto Score
             </span>
             <span className="text-sm font-mono font-semibold text-ink">
               {submissionData.verification_score ?? submissionData.raw_score} /{' '}
@@ -87,8 +100,15 @@ export default function GradingDrawer({
 
           <div className="p-2.5 bg-subtle border border-border rounded">
             <span className="text-[10px] text-ink-secondary uppercase block">Status</span>
-            <span className="text-xs font-mono font-medium text-ink capitalize">
+            <span className="text-xs font-mono font-medium text-ink capitalize truncate">
               {submissionData.execution_status || 'Graded'}
+            </span>
+          </div>
+
+          <div className="p-2.5 bg-subtle border border-border rounded">
+            <span className="text-[10px] text-ink-secondary uppercase block">Type</span>
+            <span className={`text-xs font-mono font-semibold uppercase ${isPython ? 'text-blue-600' : 'text-emerald-600'}`}>
+              {isPython ? 'Python' : 'SQL'}
             </span>
           </div>
 
@@ -100,35 +120,84 @@ export default function GradingDrawer({
           </div>
         </div>
 
-        {/* SQL Diff / View */}
+        {/* Code Diff / View */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-1.5 font-medium text-ink">
               <FileCode className="w-3.5 h-3.5" />
-              <span>Student Submitted SQL</span>
+              <span>Student Submitted {isPython ? 'Python' : 'SQL'}</span>
             </div>
           </div>
 
-          <div className="border border-border rounded bg-subtle p-3 overflow-x-auto">
+          <div className="border border-border rounded bg-subtle p-3 overflow-x-auto max-h-64">
             <pre className="font-mono text-xs text-ink whitespace-pre-wrap">
-              {submissionData.submitted_sql || '-- No SQL submission found'}
+              {submittedCode}
             </pre>
           </div>
         </div>
 
-        {/* Canonical Reference Solution */}
-        {submissionData.solution_sql && (
-          <div className="space-y-1">
-            <span className="text-[11px] font-medium text-ink-secondary">
-              Canonical Teacher Solution:
-            </span>
-            <div className="border border-border rounded bg-white p-2.5 overflow-x-auto opacity-80">
-              <pre className="font-mono text-[11px] text-ink-secondary whitespace-pre-wrap">
-                {submissionData.solution_sql}
-              </pre>
+        {/* Generated Charts/Plots (if Python) */}
+        {plots && plots.length > 0 && (
+          <div className="space-y-2">
+            <div className="flex items-center space-x-1.5 font-medium text-ink">
+              <ImageIcon className="w-3.5 h-3.5 text-blue-600" />
+              <span>Generated Visualizations ({plots.length})</span>
+            </div>
+            <div className="space-y-2">
+              {plots.map((plot: any, idx: number) => (
+                <div key={idx} className="border border-border rounded p-2 bg-white flex justify-center">
+                  <img src={plot.base64} alt={`Generated plot ${idx + 1}`} className="max-h-64 rounded object-contain" />
+                </div>
+              ))}
             </div>
           </div>
         )}
+
+        {/* Generated DataFrame Preview (if Python) */}
+        {tables && tables.length > 0 && (
+          <div className="space-y-2">
+            <div className="flex items-center space-x-1.5 font-medium text-ink">
+              <TableIcon className="w-3.5 h-3.5 text-indigo-600" />
+              <span>Generated DataFrame: {tables[0].variableName} ({tables[0].rowCount} rows)</span>
+            </div>
+            <div className="border border-border rounded overflow-x-auto max-h-48 bg-white">
+              <table className="w-full text-left border-collapse text-[11px] font-mono">
+                <thead className="bg-subtle text-ink border-b border-border">
+                  <tr>
+                    {tables[0].columns?.slice(0, 5).map((col: any, cIdx: number) => (
+                      <th key={cIdx} className="p-1.5 border-r border-border last:border-r-0 truncate max-w-[120px]">
+                        {col.name}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {tables[0].rows?.slice(0, 5).map((row: any, rIdx: number) => (
+                    <tr key={rIdx} className="border-b border-border last:border-b-0 hover:bg-subtle/50">
+                      {tables[0].columns?.slice(0, 5).map((col: any, cIdx: number) => (
+                        <td key={cIdx} className="p-1.5 border-r border-border last:border-r-0 truncate max-w-[120px]">
+                          {String(row[col.name] ?? '')}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Canonical Reference Solution */}
+        <div className="space-y-1">
+          <span className="text-[11px] font-medium text-ink-secondary">
+            Canonical Teacher Solution:
+          </span>
+          <div className="border border-border rounded bg-white p-2.5 overflow-x-auto max-h-48 opacity-80">
+            <pre className="font-mono text-[11px] text-ink-secondary whitespace-pre-wrap">
+              {solutionCode || '-- Standard verification benchmark solution'}
+            </pre>
+          </div>
+        </div>
 
         {/* Grading Controls */}
         <div className="space-y-3 pt-3 border-t border-border">
@@ -155,7 +224,7 @@ export default function GradingDrawer({
               rows={4}
               value={feedback}
               onChange={(e) => setFeedback(e.target.value)}
-              placeholder="Provide constructive feedback regarding normalization, indices, or analytical logic..."
+              placeholder="Provide constructive feedback regarding analytical logic, model assumptions, data hygiene, or visual design..."
               className="w-full p-2.5 bg-white border border-border rounded text-xs text-ink focus:outline-none focus:border-border-strong font-sans"
             />
           </div>

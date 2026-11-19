@@ -73,8 +73,13 @@ export default function GradebookMatrix({
         raw_score: breakdownItem?.raw_score ?? 0,
         verification_score: submission?.verification_score ?? breakdownItem?.raw_score ?? 0,
         version: submission?.version ?? 1,
-        submitted_sql: submission?.submitted_sql || '-- No SQL recorded',
+        language: submission?.language || assignment.language || 'sql',
+        submitted_sql: submission?.submitted_sql || '',
+        submitted_python: submission?.submitted_python || '',
         solution_sql: submission?.solution_sql || '',
+        solution_python: submission?.solution_python || '',
+        execution_artifacts: submission?.execution_artifacts || null,
+        execution_output: submission?.execution_output || null,
         execution_status: breakdownItem?.execution_status || 'graded',
         teacher_feedback: submission?.teacher_feedback || '',
       });
@@ -307,8 +312,10 @@ export default function GradebookMatrix({
                         <td
                           key={a.cohort_assignment_id}
                           data-testid="score-cell"
+                          data-student={s.student_name}
+                          data-assignment-slug={a.slug}
                           onClick={() => handleCellClick(s, a)}
-                          title="Click to view SQL & adjust score in drawer"
+                          title="Click to view submission & adjust score in drawer"
                           className="p-2.5 border-r border-border text-center cursor-pointer hover:bg-subtle transition-colors group"
                         >
                           {rawScore !== null ? (

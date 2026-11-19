@@ -36,6 +36,7 @@ export async function GET(
         ma.title,
         ma.slug,
         ma.type,
+        ma.language,
         ma.max_score,
         COALESCE(ca.weight_override, ma.weight_percentage) AS weight_percentage,
         ma.sort_order

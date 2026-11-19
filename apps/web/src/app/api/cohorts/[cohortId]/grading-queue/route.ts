@@ -17,9 +17,11 @@ export async function GET(
         s.student_id,
         s.version,
         s.submitted_sql,
+        s.submitted_python,
         s.erd_diagram_json,
         s.execution_status,
         s.execution_output,
+        s.execution_artifacts,
         s.verification_score,
         s.final_score,
         s.teacher_feedback,
@@ -30,7 +32,9 @@ export async function GET(
         u.email AS student_email,
         ma.title AS assignment_title,
         ma.slug AS assignment_slug,
+        ma.language,
         ma.solution_sql,
+        ma.solution_python,
         ma.max_score,
         ma.rubric_criteria
       FROM submissions s

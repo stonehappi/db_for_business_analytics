@@ -24,11 +24,20 @@ import {
 import { UserProfile, Course, CohortClass } from './Navigation';
 import { useDialog } from './Dialog';
 
+export type TabType =
+  | 'workspace'
+  | 'gradebook'
+  | 'curriculum'
+  | 'my-grades'
+  | 'courses'
+  | 'classes'
+  | 'students';
+
 interface SidebarProps {
   isOpen: boolean;
   onToggle: () => void;
-  activeTab: 'workspace' | 'gradebook' | 'curriculum' | 'my-grades';
-  setActiveTab: (tab: 'workspace' | 'gradebook' | 'curriculum' | 'my-grades') => void;
+  activeTab: TabType;
+  setActiveTab: (tab: TabType) => void;
   currentUser: UserProfile;
   users?: UserProfile[];
   onSelectUser?: (user: UserProfile) => void;
@@ -71,7 +80,7 @@ export default function Sidebar({
   const selectedClass = classes.find((c) => c.id === selectedCohortId) || classes[0];
   const cohortStatus = selectedClass?.status || 'active';
 
-  const handleNavClick = (tab: 'workspace' | 'gradebook' | 'curriculum' | 'my-grades') => {
+  const handleNavClick = (tab: TabType) => {
     setActiveTab(tab);
     if (typeof window !== 'undefined' && window.innerWidth < 768 && isOpen) {
       onToggle();
@@ -418,7 +427,11 @@ export default function Sidebar({
                 title="Manage All Master Courses"
                 className={`w-full flex items-center ${
                   isOpen ? 'space-x-2 px-2.5 text-left' : 'justify-center px-0'
-                } py-1.5 text-xs rounded transition-colors text-ink-secondary hover:text-ink hover:bg-subtle/50`}
+                } py-1.5 text-xs rounded transition-colors ${
+                  activeTab === 'courses'
+                    ? 'bg-subtle text-ink font-medium border border-border shadow-2xs'
+                    : 'text-ink-secondary hover:text-ink hover:bg-subtle/50'
+                }`}
               >
                 <FolderKanban className="w-4 h-4 shrink-0" />
                 {isOpen && (
@@ -437,7 +450,11 @@ export default function Sidebar({
                 title="Manage All Semester Classes"
                 className={`w-full flex items-center ${
                   isOpen ? 'space-x-2 px-2.5 text-left' : 'justify-center px-0'
-                } py-1.5 text-xs rounded transition-colors text-ink-secondary hover:text-ink hover:bg-subtle/50`}
+                } py-1.5 text-xs rounded transition-colors ${
+                  activeTab === 'classes'
+                    ? 'bg-subtle text-ink font-medium border border-border shadow-2xs'
+                    : 'text-ink-secondary hover:text-ink hover:bg-subtle/50'
+                }`}
               >
                 <Layers className="w-4 h-4 shrink-0" />
                 {isOpen && (
@@ -456,7 +473,11 @@ export default function Sidebar({
                 title="Manage Student Rosters, Import & Export"
                 className={`w-full flex items-center ${
                   isOpen ? 'space-x-2 px-2.5 text-left' : 'justify-center px-0'
-                } py-1.5 text-xs rounded transition-colors text-ink-secondary hover:text-ink hover:bg-subtle/50`}
+                } py-1.5 text-xs rounded transition-colors ${
+                  activeTab === 'students'
+                    ? 'bg-subtle text-ink font-medium border border-border shadow-2xs'
+                    : 'text-ink-secondary hover:text-ink hover:bg-subtle/50'
+                }`}
               >
                 <Users className="w-4 h-4 shrink-0" />
                 {isOpen && (

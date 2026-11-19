@@ -8,7 +8,7 @@ export default defineConfig({
   workers: 1,
   reporter: 'list',
   use: {
-    baseURL: 'http://localhost:3000',
+    baseURL: process.env.TEST_BASE_URL || 'http://localhost:8082',
     trace: 'on-first-retry',
     viewport: { width: 1440, height: 900 },
   },
@@ -18,10 +18,10 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
-  webServer: {
+  webServer: process.env.TEST_BASE_URL ? undefined : {
     command: 'node apps/web/.next/standalone/apps/web/server.js',
-    url: 'http://localhost:3000',
-    reuseExistingServer: !process.env.CI,
+    url: 'http://localhost:8082',
+    reuseExistingServer: true,
     timeout: 60000,
   },
 });

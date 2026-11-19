@@ -58,6 +58,7 @@ services:
       - JWT_SECRET=${JWT_SECRET}
       - AUTO_MIGRATE=${AUTO_MIGRATE:-true}
       - AUTO_SEED=${AUTO_SEED:-false}
+      - PYTHON_RUNNER_URL=http://python-sandbox:8000
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/health || exit 1"]
       interval: 10s
@@ -79,6 +80,8 @@ services:
         condition: service_healthy
       postgres-sandbox:
         condition: service_healthy
+      python-sandbox:
+        condition: service_healthy
 
   # ----------------------------------------------------------------------------
   # Application Database (Primary OLTP)
@@ -98,7 +101,9 @@ services:
       -c default_statistics_target=100
       -c random_page_cost=1.1
       -c effective_io_concurrency=200
-    # Internal private network only - zero host port exposure
+    # Host port mapping for local development and direct DB access
+    ports:
+      - "${APP_DB_PORT:-5432}:5432"
     expose:
       - "5432"
     environment:
@@ -138,7 +143,9 @@ services:
       -c idle_in_transaction_session_timeout=5000
       -c work_mem=16MB
       -c temp_file_limit=50MB
-    # Internal private network only - zero host port exposure
+    # Host port mapping for local development and direct DB access
+    ports:
+      - "${SANDBOX_DB_PORT:-5435}:5432"
     expose:
       - "5432"
     environment:
@@ -164,6 +171,42 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+
+  # ----------------------------------------------------------------------------
+  # Python Analytics Sandbox Runner (Isolated Execution Service)
+  # ----------------------------------------------------------------------------
+  python-sandbox:
+    build:
+      context: ./docker/python-runner
+      dockerfile: Dockerfile
+    image: db_platform_python_sandbox:latest
+    container_name: db_platform_python_sandbox
+    restart: always
+    ports:
+      - "${PYTHON_RUNNER_PORT:-8000}:8000"
+    expose:
+      - "8000"
+    environment:
+      - SANDBOX_STUDENT_DATABASE_URL=postgresql://${STUDENT_SANDBOX_USER:-student_sandbox_user}:${STUDENT_SANDBOX_PASSWORD:-sandbox_safe_pw}@postgres-sandbox:5432/${POSTGRES_SANDBOX_DB:-sandbox_db}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
+          memory: 1024M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+    depends_on:
+      postgres-sandbox:
+        condition: service_healthy
 
   # ----------------------------------------------------------------------------
   # In-Container Automated Database Backup Service

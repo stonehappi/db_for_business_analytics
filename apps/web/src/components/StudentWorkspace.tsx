@@ -19,6 +19,9 @@ import {
   Briefcase,
   Calendar,
   RotateCcw,
+  Image as ImageIcon,
+  Terminal,
+  Download,
 } from 'lucide-react';
 import { UserProfile } from './Navigation';
 import LectureSlideViewer from './LectureSlideViewer';
@@ -33,6 +36,7 @@ interface Assignment {
   title: string;
   slug: string;
   type: string;
+  language?: string;
   max_score: number;
   weight_percentage: number;
   due_at: string;
@@ -53,13 +57,18 @@ export default function StudentWorkspace({ currentUser, cohortId, courseId }: St
 
   const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
   const [assignmentDetail, setAssignmentDetail] = useState<any>(null);
-  const [sqlCode, setSqlCode] = useState<string>('');
+  const [code, setCode] = useState<string>('');
   const [isRunning, setIsRunning] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const [activeBottomTab, setActiveBottomTab] = useState<'results' | 'tests' | 'schema'>('results');
+  const [activeBottomTab, setActiveBottomTab] = useState<'results' | 'plots' | 'logs' | 'tests' | 'schema'>('results');
   const [executionResult, setExecutionResult] = useState<any>(null);
   const [submissionFeedback, setSubmissionFeedback] = useState<any>(null);
   const [schemaTables, setSchemaTables] = useState<any[]>([]);
+
+  const isPython =
+    selectedAssignment?.language === 'python' ||
+    assignmentDetail?.language === 'python' ||
+    !!assignmentDetail?.starterPython;
 
   // 1. Fetch modules with lecture slides and quiz data
   useEffect(() => {
@@ -100,7 +109,15 @@ export default function StudentWorkspace({ currentUser, cohortId, courseId }: St
       );
       if (found) {
         setAssignmentDetail(found);
-        setSqlCode(found.starterSql || '-- Write your SQL query here\n');
+        const assignLang = found.language || selectedAssignment.language || 'sql';
+        if (assignLang === 'python') {
+          setCode(
+            found.starterPython ||
+              `# Python Analytics Assignment: ${found.title}\nimport pandas as pd\nimport numpy as np\nimport matplotlib.pyplot as plt\n\n# Your code here:\n`
+          );
+        } else {
+          setCode(found.starterSql || '-- Write your SQL query here\n');
+        }
         setSelectedWeekNum(m.weekNumber);
         break;
       }
@@ -132,7 +149,7 @@ export default function StudentWorkspace({ currentUser, cohortId, courseId }: St
     }
   };
 
-  // Execute Sandbox Query
+  // Execute Sandbox Query / Python Script
   const handleRunSandbox = async () => {
     if (!selectedAssignment || isRunning) return;
     setIsRunning(true);
@@ -145,16 +162,31 @@ export default function StudentWorkspace({ currentUser, cohortId, courseId }: St
         body: JSON.stringify({
           cohortAssignmentId: selectedAssignment.cohort_assignment_id,
           masterAssignmentId: selectedAssignment.master_assignment_id,
-          sqlCode,
+          code,
+          sqlCode: !isPython ? code : undefined,
+          pythonCode: isPython ? code : undefined,
+          language: isPython ? 'python' : 'sql',
         }),
       });
       const data = await res.json();
       setExecutionResult(data);
+
       if (data.status === 'success') {
-        setActiveBottomTab('results');
+        if (isPython && data.plots && data.plots.length > 0) {
+          setActiveBottomTab('plots');
+        } else if (isPython && data.tables && data.tables.length > 0) {
+          setActiveBottomTab('results');
+        } else if (!isPython && data.rows) {
+          setActiveBottomTab('results');
+        } else if (isPython && data.stdout) {
+          setActiveBottomTab('logs');
+        } else {
+          setActiveBottomTab('results');
+        }
       } else {
         setActiveBottomTab('tests');
       }
+
       if (typeof window !== 'undefined' && window.innerWidth < 1024) {
         setMobilePanel('results');
       }
@@ -181,7 +213,9 @@ export default function StudentWorkspace({ currentUser, cohortId, courseId }: St
         body: JSON.stringify({
           cohortAssignmentId: selectedAssignment.cohort_assignment_id,
           studentId: currentUser.id,
-          submittedSql: sqlCode,
+          submittedSql: isPython ? null : code,
+          submittedPython: isPython ? code : null,
+          language: isPython ? 'python' : 'sql',
         }),
       });
       const data = await res.json();
@@ -199,15 +233,18 @@ export default function StudentWorkspace({ currentUser, cohortId, courseId }: St
 
   const { confirm } = useDialog();
 
-  // Reset Query to Starter Code
+  // Reset to Starter Code
   const handleResetStarterCode = async () => {
-    const starter = assignmentDetail?.starterSql || '-- Write your SQL query here\n';
-    if (sqlCode === starter) return;
+    const starter = isPython
+      ? assignmentDetail?.starterPython || '# Write your Python analytics code here\n'
+      : assignmentDetail?.starterSql || '-- Write your SQL query here\n';
+    if (code === starter) return;
 
     const ok = await confirm({
       title: 'Reset to Starter Code?',
-      message:
-        'Are you sure you want to discard your current SQL query and restore the original template? All unsaved modifications in the editor will be lost.',
+      message: `Are you sure you want to discard your current ${
+        isPython ? 'Python' : 'SQL'
+      } script and restore the original template? All unsaved modifications in the editor will be lost.`,
       confirmText: 'Reset Code',
       cancelText: 'Keep Current Code',
       variant: 'warning',
@@ -215,7 +252,7 @@ export default function StudentWorkspace({ currentUser, cohortId, courseId }: St
     });
 
     if (ok) {
-      setSqlCode(starter);
+      setCode(starter);
     }
   };
 
@@ -228,6 +265,12 @@ export default function StudentWorkspace({ currentUser, cohortId, courseId }: St
       lectureSlidesHtml: '',
       quizData: [],
     };
+
+  // Extract tabular rows & columns whether SQL or Python
+  const hasSqlRows = !isPython && executionResult?.status === 'success' && executionResult.rows;
+  const primaryTable = isPython && executionResult?.tables && executionResult.tables.length > 0
+    ? executionResult.tables[0]
+    : null;
 
   return (
     <div className="flex flex-col h-[calc(100vh-3rem)] w-full overflow-hidden bg-canvas font-sans">
@@ -250,6 +293,44 @@ export default function StudentWorkspace({ currentUser, cohortId, courseId }: St
               ))}
             </select>
           </div>
+
+          {/* Assignment Switcher if module has multiple assignments */}
+          {currentModule?.assignments && currentModule.assignments.length > 1 && (
+            <div className="flex items-center space-x-1.5 shrink-0">
+              <select
+                value={selectedAssignment?.slug || ''}
+                onChange={(e) => {
+                  const targetSlug = e.target.value;
+                  const cohortMatch = assignments.find((a) => a.slug === targetSlug);
+                  const modMatch = currentModule.assignments?.find((a: any) => a.slug === targetSlug);
+                  if (cohortMatch) {
+                    setSelectedAssignment(cohortMatch);
+                  } else if (modMatch) {
+                    setSelectedAssignment({
+                      cohort_assignment_id: modMatch.id,
+                      master_assignment_id: modMatch.id,
+                      title: modMatch.title,
+                      slug: modMatch.slug,
+                      type: modMatch.type,
+                      language: modMatch.language || 'sql',
+                      max_score: modMatch.maxScore || 100,
+                      weight_percentage: modMatch.weightPercentage || 5,
+                      due_at: '',
+                    });
+                  }
+                }}
+                data-testid="student-assignment-selector"
+                className="text-xs bg-subtle border border-border rounded px-2 py-1 font-mono font-medium text-ink focus:outline-none focus:border-border-strong cursor-pointer"
+              >
+                {currentModule.assignments.map((a: any) => (
+                  <option key={a.id} value={a.slug}>
+                    {a.language === 'python' ? 'Python: ' : 'SQL: '} {a.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <span className="text-xs text-ink-secondary hidden md:inline truncate max-w-[320px]">
             {currentModule?.description}
           </span>
@@ -327,7 +408,7 @@ export default function StudentWorkspace({ currentUser, cohortId, courseId }: St
           </div>
         )}
 
-        {/* PILLAR 3: PROJECT (EXISTING 3-PANEL CODE & SANDBOX WORKSPACE) */}
+        {/* PILLAR 3: PROJECT (3-PANEL CODE & SANDBOX WORKSPACE) */}
         {activeStudentTab === 'project' && (
           <div className="flex flex-col lg:flex-row h-full w-full overflow-hidden">
             {/* Mobile View Panel Switcher (Only visible on screens < lg) */}
@@ -352,7 +433,7 @@ export default function StudentWorkspace({ currentUser, cohortId, courseId }: St
                 }`}
               >
                 <Layers className="w-3.5 h-3.5" />
-                <span>SQL Editor</span>
+                <span>Editor</span>
               </button>
               <button
                 onClick={() => setMobilePanel('results')}
@@ -363,74 +444,63 @@ export default function StudentWorkspace({ currentUser, cohortId, courseId }: St
                 }`}
               >
                 <Table className="w-3.5 h-3.5" />
-                <span>Results</span>
+                <span>Outputs</span>
               </button>
             </div>
 
-            {/* LEFT PANEL: Business Case, Requirements & Rubric */}
+            {/* LEFT PANEL: Business Case Brief (Width: 32% on lg screens) */}
             <div
               className={`${
                 mobilePanel === 'brief' ? 'flex' : 'hidden'
-              } lg:flex w-full lg:w-[32%] lg:min-w-[320px] lg:max-w-[480px] h-full border-r border-border bg-surface flex-col shrink-0`}
+              } lg:flex w-full lg:w-[32%] lg:min-w-[340px] lg:max-w-[460px] flex-col border-b lg:border-b-0 lg:border-r border-border bg-surface shrink-0 h-full overflow-hidden`}
             >
-              {/* Header & Assignment Selector */}
-              <div className="p-3 border-b border-border bg-subtle/50 flex flex-col space-y-2 shrink-0">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] uppercase tracking-wider font-semibold text-ink-secondary">
-                    Assignment Scenario
-                  </span>
-                  <span className="text-[11px] font-mono px-1.5 py-0.5 bg-subtle border border-border rounded text-ink font-medium">
-                    Weight: {selectedAssignment?.weight_percentage}%
+              <div className="p-3 bg-subtle border-b border-border flex items-center justify-between shrink-0">
+                <div className="flex items-center space-x-2">
+                  <FileText className="w-4 h-4 text-ink-secondary" />
+                  <span className="font-semibold text-xs text-ink uppercase tracking-wider">
+                    Assignment Scenario & Business Case Brief
                   </span>
                 </div>
-
-                <select
-                  data-testid="assignment-selector"
-                  value={selectedAssignment?.cohort_assignment_id || ''}
-                  onChange={(e) => {
-                    const a = assignments.find((x) => x.cohort_assignment_id === e.target.value);
-                    if (a) setSelectedAssignment(a);
-                  }}
-                  className="w-full text-xs bg-surface border border-border rounded p-1.5 text-ink font-medium focus:outline-none focus:border-border-strong cursor-pointer"
-                >
-                  {assignments.map((a) => (
-                    <option key={a.cohort_assignment_id} value={a.cohort_assignment_id}>
-                      {a.title} ({a.weight_percentage}%)
-                    </option>
-                  ))}
-                </select>
+                <div className="flex items-center space-x-1.5">
+                  <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-semibold uppercase ${
+                    isPython ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                  }`}>
+                    {isPython ? 'Python' : 'SQL'}
+                  </span>
+                  <span className="text-[10px] font-mono text-ink-secondary bg-white px-1.5 py-0.5 border border-border rounded">
+                    Max: {selectedAssignment?.max_score || 100} pts
+                  </span>
+                </div>
               </div>
 
-              {/* Narrative & Rubric Content */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-4 text-xs leading-relaxed">
+              <div className="flex-1 overflow-y-auto p-4 space-y-4 text-xs text-ink leading-relaxed font-sans">
                 {assignmentDetail ? (
                   <>
-                    {/* Business Case Brief */}
-                    <div className="space-y-2">
-                      <div className="flex items-center space-x-1.5 text-ink font-medium border-b border-border pb-1">
-                        <FileText className="w-3.5 h-3.5" />
-                        <span>Business Case Description</span>
-                      </div>
-                      <div className="text-ink-secondary whitespace-pre-wrap font-sans">
+                    <h3 className="font-semibold text-sm text-ink mb-1">
+                      {assignmentDetail.title}
+                    </h3>
+                    <div className="space-y-1">
+                      <span className="font-semibold text-xs text-ink block">
+                        Business Case Description
+                      </span>
+                      <div className="prose prose-xs max-w-none text-ink-secondary whitespace-pre-wrap font-sans">
                         {assignmentDetail.businessCaseMarkdown}
                       </div>
                     </div>
 
-                    {/* Rubric Criteria Checklist */}
                     {assignmentDetail.rubricCriteria && assignmentDetail.rubricCriteria.length > 0 && (
-                      <div className="space-y-2 pt-2 border-t border-border">
-                        <div className="flex items-center space-x-1.5 text-ink font-medium">
-                          <CheckSquare className="w-3.5 h-3.5" />
-                          <span>Evaluation Rubric Criteria</span>
-                        </div>
+                      <div className="mt-4 pt-3 border-t border-border">
+                        <span className="font-semibold text-xs text-ink block mb-2">
+                          Evaluation Rubric Criteria
+                        </span>
                         <div className="space-y-1.5">
                           {assignmentDetail.rubricCriteria.map((r: any, idx: number) => (
                             <div
                               key={idx}
-                              className="p-2 bg-subtle border border-border rounded flex items-center justify-between"
+                              className="flex items-center justify-between p-2 rounded bg-subtle border border-border text-[11px]"
                             >
-                              <span className="text-ink font-normal">{r.criterion}</span>
-                              <span className="font-mono text-[11px] text-ink-secondary font-medium ml-2">
+                              <span className="text-ink font-medium">{r.criterion}</span>
+                              <span className="font-mono text-ink-secondary font-semibold">
                                 {r.points} pts
                               </span>
                             </div>
@@ -451,7 +521,7 @@ export default function StudentWorkspace({ currentUser, cohortId, courseId }: St
                 mobilePanel !== 'brief' ? 'flex' : 'hidden'
               } lg:flex flex-1 h-full flex-col overflow-hidden min-w-0`}
             >
-              {/* TOP-RIGHT: Monaco SQL Editor & Execution Toolbar (Height: 55%) */}
+              {/* TOP-RIGHT: Editor & Execution Toolbar */}
               <div
                 className={`${
                   mobilePanel === 'results' ? 'hidden lg:flex' : 'flex'
@@ -461,13 +531,13 @@ export default function StudentWorkspace({ currentUser, cohortId, courseId }: St
                 <div className="h-10 px-3 bg-subtle/40 border-b border-border flex items-center justify-between shrink-0">
                   <div className="flex items-center space-x-2">
                     <span
-                      title={selectedAssignment?.slug ? `${selectedAssignment.slug}.sql` : 'query.sql'}
+                      title={selectedAssignment?.slug ? `${selectedAssignment.slug}.${isPython ? 'py' : 'sql'}` : `analysis.${isPython ? 'py' : 'sql'}`}
                       className="text-xs font-mono font-medium text-ink truncate max-w-[120px] xs:max-w-[180px] sm:max-w-none"
                     >
-                      {selectedAssignment?.slug ? `${selectedAssignment.slug}.sql` : 'query.sql'}
+                      {selectedAssignment?.slug ? `${selectedAssignment.slug}.${isPython ? 'py' : 'sql'}` : `analysis.${isPython ? 'py' : 'sql'}`}
                     </span>
-                    <span className="text-[10px] text-ink-secondary font-mono px-1.5 py-0.2 bg-white border border-border rounded hidden xs:inline">
-                      PostgreSQL 16
+                    <span className="text-[10px] text-ink-secondary font-mono px-1.5 py-0.2 bg-white border border-border rounded inline">
+                      {isPython ? 'Python 3.11' : 'PostgreSQL 16'}
                     </span>
                   </div>
 
@@ -475,7 +545,7 @@ export default function StudentWorkspace({ currentUser, cohortId, courseId }: St
                     <button
                       onClick={handleResetStarterCode}
                       data-testid="reset-query-btn"
-                      title="Reset Query to Starter Code"
+                      title="Reset Code to Starter Template"
                       className="p-1 hover:bg-subtle text-ink-secondary hover:text-ink rounded transition-colors"
                     >
                       <RotateCcw className="w-3.5 h-3.5" />
@@ -510,39 +580,75 @@ export default function StudentWorkspace({ currentUser, cohortId, courseId }: St
                 {/* Monaco Editor Container */}
                 <div className="flex-1 w-full overflow-hidden">
                   <MonacoSqlEditor
-                    value={sqlCode}
-                    onChange={setSqlCode}
+                    value={code}
+                    language={isPython ? 'python' : 'sql'}
+                    onChange={setCode}
                     onRun={handleRunSandbox}
                   />
                 </div>
               </div>
 
-              {/* BOTTOM-RIGHT: Query Results, Verification Tests & Schema Inspector (Height: 45%) */}
+              {/* BOTTOM-RIGHT: Outputs, Plots, Tests & Schema Inspector (Height: 45%) */}
               <div
                 className={`${
                   mobilePanel === 'editor' ? 'hidden lg:flex' : 'flex'
                 } h-full lg:h-[45%] flex-col bg-surface overflow-hidden`}
               >
                 {/* Bottom Tabs Header */}
-                <div className="h-9 px-3 bg-subtle border-b border-border flex items-center justify-between shrink-0">
+                <div className="h-9 px-3 bg-subtle border-b border-border flex items-center justify-between shrink-0 overflow-x-auto">
                   <div className="flex items-center space-x-1">
                     <button
                       onClick={() => setActiveBottomTab('results')}
                       data-testid="tab-results"
-                      className={`px-2.5 py-1 text-xs rounded transition-colors flex items-center space-x-1.5 ${
+                      className={`px-2.5 py-1 text-xs rounded transition-colors flex items-center space-x-1.5 shrink-0 ${
                         activeBottomTab === 'results'
                           ? 'bg-white text-ink font-medium border border-border'
                           : 'text-ink-secondary hover:text-ink'
                       }`}
                     >
                       <Table className="w-3 h-3" />
-                      <span>Query Results</span>
+                      <span>{isPython ? 'DataFrames' : 'Query Results'}</span>
                     </button>
+
+                    {isPython && (
+                      <button
+                        onClick={() => setActiveBottomTab('plots')}
+                        data-testid="tab-plots"
+                        className={`px-2.5 py-1 text-xs rounded transition-colors flex items-center space-x-1.5 shrink-0 ${
+                          activeBottomTab === 'plots'
+                            ? 'bg-white text-ink font-medium border border-border'
+                            : 'text-ink-secondary hover:text-ink'
+                        }`}
+                      >
+                        <ImageIcon className="w-3 h-3" />
+                        <span>Plots & Visualizations</span>
+                        {executionResult?.plots && executionResult.plots.length > 0 && (
+                          <span className="px-1 py-0.2 text-[10px] font-mono bg-blue-100 text-blue-700 rounded-full">
+                            {executionResult.plots.length}
+                          </span>
+                        )}
+                      </button>
+                    )}
+
+                    {isPython && (
+                      <button
+                        onClick={() => setActiveBottomTab('logs')}
+                        data-testid="tab-logs"
+                        className={`px-2.5 py-1 text-xs rounded transition-colors flex items-center space-x-1.5 shrink-0 ${
+                          activeBottomTab === 'logs'
+                            ? 'bg-white text-ink font-medium border border-border'
+                            : 'text-ink-secondary hover:text-ink'
+                        }`}
+                      >
+                        <Terminal className="w-3 h-3" />
+                        <span>Console Logs</span>
+                      </button>
+                    )}
 
                     <button
                       onClick={() => setActiveBottomTab('tests')}
                       data-testid="tab-tests"
-                      className={`px-2.5 py-1 text-xs rounded transition-colors flex items-center space-x-1.5 ${
+                      className={`px-2.5 py-1 text-xs rounded transition-colors flex items-center space-x-1.5 shrink-0 ${
                         activeBottomTab === 'tests'
                           ? 'bg-white text-ink font-medium border border-border'
                           : 'text-ink-secondary hover:text-ink'
@@ -564,7 +670,7 @@ export default function StudentWorkspace({ currentUser, cohortId, courseId }: St
                     <button
                       onClick={() => setActiveBottomTab('schema')}
                       data-testid="tab-schema"
-                      className={`px-2.5 py-1 text-xs rounded transition-colors flex items-center space-x-1.5 ${
+                      className={`px-2.5 py-1 text-xs rounded transition-colors flex items-center space-x-1.5 shrink-0 ${
                         activeBottomTab === 'schema'
                           ? 'bg-white text-ink font-medium border border-border'
                           : 'text-ink-secondary hover:text-ink'
@@ -577,13 +683,13 @@ export default function StudentWorkspace({ currentUser, cohortId, courseId }: St
 
                   {/* Execution timing stats */}
                   {executionResult && (
-                    <div className="flex items-center space-x-2 text-[11px] font-mono text-ink-secondary">
+                    <div className="flex items-center space-x-2 text-[11px] font-mono text-ink-secondary shrink-0 ml-2">
                       <div className="flex items-center space-x-1">
                         <Clock className="w-3 h-3" />
                         <span>{executionResult.executionTimeMs}ms</span>
                       </div>
-                      {executionResult.rowCount !== undefined && (
-                        <span>• {executionResult.rowCount} rows</span>
+                      {(executionResult.rowCount !== undefined || primaryTable?.rowCount !== undefined) && (
+                        <span>• {executionResult.rowCount ?? primaryTable?.rowCount} rows</span>
                       )}
                     </div>
                   )}
@@ -606,10 +712,11 @@ export default function StudentWorkspace({ currentUser, cohortId, courseId }: St
 
                 {/* Tab Content Panes */}
                 <div className="flex-1 overflow-auto p-3">
-                  {/* TAB 1: Query Results Table */}
+                  {/* TAB 1: Query Results / DataFrames */}
                   {activeBottomTab === 'results' && (
                     <>
-                      {executionResult?.status === 'success' && executionResult.rows ? (
+                      {/* SQL Query Results Table */}
+                      {hasSqlRows && (
                         <div className="border border-border rounded overflow-hidden">
                           <table className="w-full text-left border-collapse text-xs font-mono">
                             <thead className="bg-subtle text-ink font-medium border-b border-border">
@@ -647,9 +754,61 @@ export default function StudentWorkspace({ currentUser, cohortId, courseId }: St
                             </tbody>
                           </table>
                         </div>
-                      ) : executionResult?.status === 'syntax_error' ||
-                        executionResult?.status === 'security_violation' ||
-                        executionResult?.status === 'timeout_error' ? (
+                      )}
+
+                      {/* Python DataFrame Results Table */}
+                      {isPython && primaryTable && (
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between text-xs text-ink-secondary">
+                            <span className="font-mono font-medium text-ink">
+                              DataFrame: <code className="text-blue-600">{primaryTable.variableName}</code> ({primaryTable.rowCount} rows, {primaryTable.columnCount} columns)
+                            </span>
+                            <span className="text-[11px]">Previewing top {primaryTable.rows.length} records</span>
+                          </div>
+                          <div className="border border-border rounded overflow-x-auto">
+                            <table className="w-full text-left border-collapse text-xs font-mono">
+                              <thead className="bg-subtle text-ink font-medium border-b border-border">
+                                <tr>
+                                  {primaryTable.columns?.map((col: any, idx: number) => (
+                                    <th key={idx} className="p-2 border-r border-border last:border-r-0">
+                                      <div className="flex flex-col">
+                                        <span>{col.name}</span>
+                                        <span className="text-[10px] text-ink-secondary font-normal font-sans">
+                                          {col.type}
+                                        </span>
+                                      </div>
+                                    </th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {primaryTable.rows.map((row: any, rIdx: number) => (
+                                  <tr
+                                    key={rIdx}
+                                    className="border-b border-border last:border-b-0 hover:bg-subtle/50 tabular-nums"
+                                  >
+                                    {primaryTable.columns?.map((col: any, cIdx: number) => (
+                                      <td
+                                        key={cIdx}
+                                        className="p-2 border-r border-border last:border-r-0 truncate max-w-[200px]"
+                                      >
+                                        {row[col.name] !== null && row[col.name] !== undefined
+                                          ? String(row[col.name])
+                                          : <span className="text-ink-muted italic">NaN</span>}
+                                      </td>
+                                    ))}
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Execution Error display */}
+                      {executionResult && (executionResult.status === 'syntax_error' ||
+                        executionResult.status === 'security_violation' ||
+                        executionResult.status === 'timeout_error') && (
                         <div className="p-3 bg-red-50 border border-status-danger/30 rounded text-xs space-y-1">
                           <div className="flex items-center space-x-1.5 text-status-danger font-medium">
                             <AlertCircle className="w-4 h-4" />
@@ -658,18 +817,78 @@ export default function StudentWorkspace({ currentUser, cohortId, courseId }: St
                             </span>
                           </div>
                           <pre className="font-mono text-status-danger whitespace-pre-wrap">
-                            {executionResult.error}
+                            {executionResult.error || executionResult.details}
                           </pre>
                         </div>
-                      ) : (
+                      )}
+
+                      {/* Empty state when nothing executed yet */}
+                      {!executionResult && (
                         <div className="h-full flex items-center justify-center text-ink-secondary text-xs">
-                          Write your analytical SQL above and press &ldquo;Run Sandbox&rdquo; or Ctrl+Enter to inspect query output.
+                          {isPython
+                            ? 'Write your Python analytics script above and click "Run Sandbox" (Ctrl+Enter) to compute DataFrames and metrics.'
+                            : 'Write your analytical SQL above and press "Run Sandbox" or Ctrl+Enter to inspect query output.'}
                         </div>
                       )}
                     </>
                   )}
 
-                  {/* TAB 2: Verification Tests */}
+                  {/* TAB 2: Python Plots & Visualizations */}
+                  {activeBottomTab === 'plots' && isPython && (
+                    <div className="space-y-4">
+                      {executionResult?.plots && executionResult.plots.length > 0 ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {executionResult.plots.map((plot: any, idx: number) => (
+                            <div key={idx} className="border border-border rounded bg-white p-3 flex flex-col items-center space-y-2 shadow-2xs">
+                              <div className="w-full flex items-center justify-between text-xs text-ink-secondary border-b border-border pb-1.5">
+                                <span className="font-medium font-sans">Figure {idx + 1}</span>
+                                <a
+                                  href={plot.base64}
+                                  download={`chart_${idx + 1}.png`}
+                                  className="p-1 hover:bg-subtle rounded text-ink transition-colors flex items-center space-x-1"
+                                  title="Download PNG"
+                                >
+                                  <Download className="w-3.5 h-3.5" />
+                                  <span className="text-[10px]">Save</span>
+                                </a>
+                              </div>
+                              <img
+                                src={plot.base64}
+                                alt={`Analysis Plot ${idx + 1}`}
+                                className="max-h-72 w-auto object-contain rounded"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="h-full flex flex-col items-center justify-center text-ink-secondary text-xs py-8">
+                          <ImageIcon className="w-8 h-8 stroke-1 text-ink-muted mb-2" />
+                          <span>No figures detected in current execution.</span>
+                          <span className="text-[11px] text-ink-muted mt-1">
+                            Call <code>plt.plot()</code> or <code>sns.heatmap()</code> to display visualizations here.
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* TAB 3: Console Logs (stdout / stderr) */}
+                  {activeBottomTab === 'logs' && isPython && (
+                    <div className="font-mono text-xs space-y-2">
+                      <div className="bg-zinc-950 text-zinc-100 p-3 rounded border border-zinc-800 min-h-[140px] overflow-x-auto whitespace-pre-wrap">
+                        {executionResult?.stdout || (
+                          <span className="text-zinc-500 italic">-- No standard output (print statements) produced --</span>
+                        )}
+                        {executionResult?.stderr && (
+                          <div className="mt-2 pt-2 border-t border-zinc-800 text-amber-400">
+                            {executionResult.stderr}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* TAB 4: Verification Tests */}
                   {activeBottomTab === 'tests' && (
                     <div className="space-y-3">
                       {executionResult?.testResults ? (
@@ -707,13 +926,13 @@ export default function StudentWorkspace({ currentUser, cohortId, courseId }: St
                         </div>
                       ) : (
                         <div className="text-ink-secondary text-xs text-center py-6">
-                          Run query to execute automated test assertions against reference calculations.
+                          Run code to execute automated test assertions against reference models and metrics.
                         </div>
                       )}
                     </div>
                   )}
 
-                  {/* TAB 3: Schema Inspector */}
+                  {/* TAB 5: Schema Inspector */}
                   {activeBottomTab === 'schema' && (
                     <div className="space-y-3 text-xs">
                       <div className="text-ink-secondary text-[11px] font-sans">

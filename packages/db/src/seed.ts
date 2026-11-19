@@ -609,6 +609,10 @@ ORDER BY order_year DESC;`,
 
     const assignmentsWithOrder = assignments.map((a, idx) => ({
       ...a,
+      language: 'sql',
+      starterPython: null,
+      solutionPython: null,
+      verificationPython: null,
       sortOrder: idx + 1,
     }));
 
@@ -620,12 +624,16 @@ ORDER BY order_year DESC;`,
         title: w.project!.title,
         slug: w.project!.slug,
         type: w.project!.type,
+        language: w.project!.language || 'sql',
         maxScore: w.project!.maxScore,
         weightPercentage: w.project!.weightPercentage,
         businessCase: w.project!.businessCase,
-        starterSql: w.project!.starterSql,
-        solutionSql: w.project!.solutionSql,
-        verificationSql: w.project!.verificationSql,
+        starterSql: w.project!.starterSql || null,
+        solutionSql: w.project!.solutionSql || null,
+        verificationSql: w.project!.verificationSql || null,
+        starterPython: w.project!.starterPython || null,
+        solutionPython: w.project!.solutionPython || null,
+        verificationPython: w.project!.verificationPython || null,
         rubric: w.project!.rubric,
         sortOrder: 100 + w.num,
       }));
@@ -638,22 +646,32 @@ ORDER BY order_year DESC;`,
       const moduleId = moduleMap[a.weekNum];
       await client.query(`
         INSERT INTO master_assignments (
-          id, module_id, title, slug, type, business_case_markdown, starter_sql, solution_sql, verification_sql, max_score, weight_percentage, rubric_criteria, sort_order
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+          id, module_id, title, slug, type, language, business_case_markdown,
+          starter_sql, solution_sql, verification_sql,
+          starter_python, solution_python, verification_python,
+          max_score, weight_percentage, rubric_criteria, sort_order
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
         ON CONFLICT (id) DO UPDATE SET
           title = EXCLUDED.title,
           slug = EXCLUDED.slug,
           type = EXCLUDED.type,
+          language = EXCLUDED.language,
           business_case_markdown = EXCLUDED.business_case_markdown,
           starter_sql = EXCLUDED.starter_sql,
           solution_sql = EXCLUDED.solution_sql,
           verification_sql = EXCLUDED.verification_sql,
+          starter_python = EXCLUDED.starter_python,
+          solution_python = EXCLUDED.solution_python,
+          verification_python = EXCLUDED.verification_python,
           max_score = EXCLUDED.max_score,
           weight_percentage = EXCLUDED.weight_percentage,
           rubric_criteria = EXCLUDED.rubric_criteria,
           sort_order = EXCLUDED.sort_order;
       `, [
-        a.id, moduleId, a.title, a.slug, a.type, a.businessCase, a.starterSql, a.solutionSql, a.verificationSql, a.maxScore, a.weightPercentage, JSON.stringify(a.rubric), a.sortOrder
+        a.id, moduleId, a.title, a.slug, a.type, a.language, a.businessCase,
+        a.starterSql, a.solutionSql, a.verificationSql,
+        a.starterPython, a.solutionPython, a.verificationPython,
+        a.maxScore, a.weightPercentage, JSON.stringify(a.rubric), a.sortOrder
       ]);
 
       // Publish to Cohort
@@ -734,16 +752,19 @@ ORDER BY order_year DESC;`,
         const cohortAssignId = assignmentIdMap[slug];
         if (!cohortAssignId) continue;
 
-        const assignObj = assignments.find(a => a.slug === slug);
-        const submittedSql = assignObj ? assignObj.solutionSql : 'SELECT 1;';
+        const assignObj = allAssignments.find(a => a.slug === slug);
+        const isPythonAssign = assignObj?.language === 'python';
+        const submittedSql = isPythonAssign ? null : (assignObj ? assignObj.solutionSql || 'SELECT 1;' : 'SELECT 1;');
+        const submittedPython = isPythonAssign ? (assignObj ? assignObj.solutionPython || '# Python solution' : '# Python') : null;
 
         await client.query(`
           INSERT INTO submissions (
-            cohort_assignment_id, student_id, version, submitted_sql, execution_status,
+            cohort_assignment_id, student_id, version, submitted_sql, submitted_python, execution_status,
             execution_output, verification_score, final_score, teacher_feedback, graded_by, submitted_at, graded_at
-          ) VALUES ($1, $2, 1, $3, 'graded', $4, $5, $6, $7, $8, NOW() - INTERVAL '3 days', NOW() - INTERVAL '1 day')
+          ) VALUES ($1, $2, 1, $3, $4, 'graded', $5, $6, $7, $8, $9, NOW() - INTERVAL '3 days', NOW() - INTERVAL '1 day')
           ON CONFLICT (cohort_assignment_id, student_id, version) DO UPDATE SET
             submitted_sql = EXCLUDED.submitted_sql,
+            submitted_python = EXCLUDED.submitted_python,
             execution_status = 'graded',
             verification_score = EXCLUDED.verification_score,
             final_score = EXCLUDED.final_score,
@@ -753,6 +774,7 @@ ORDER BY order_year DESC;`,
           cohortAssignId,
           sg.studentId,
           submittedSql,
+          submittedPython,
           JSON.stringify({ passed: true, executionTimeMs: 18.5, rowCount: 5 }),
           grade.ver,
           grade.final,

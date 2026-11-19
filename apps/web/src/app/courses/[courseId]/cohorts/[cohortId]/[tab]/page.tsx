@@ -10,7 +10,15 @@ interface RouteProps {
   };
 }
 
-const VALID_TABS: TabType[] = ['workspace', 'gradebook', 'curriculum', 'my-grades'];
+const VALID_TABS: TabType[] = [
+  'workspace',
+  'gradebook',
+  'curriculum',
+  'my-grades',
+  'courses',
+  'classes',
+  'students',
+];
 
 export default function CourseCohortTabPage({ params }: RouteProps) {
   const tab: TabType = VALID_TABS.includes(params.tab as TabType)

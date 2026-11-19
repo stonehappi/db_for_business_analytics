@@ -2,10 +2,10 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams, usePathname } from 'next/navigation';
-import Sidebar from '@/components/Sidebar';
-import CourseManagementModal from '@/components/CourseManagementModal';
-import ClassManagementModal from '@/components/ClassManagementModal';
-import StudentManagementModal from '@/components/StudentManagementModal';
+import Sidebar, { TabType } from '@/components/Sidebar';
+import CourseManagementView from '@/components/CourseManagementView';
+import ClassManagementView from '@/components/ClassManagementView';
+import StudentManagementView from '@/components/StudentManagementView';
 import { UserProfile, Course, CohortClass } from '@/components/Navigation';
 import StudentWorkspace from '@/components/StudentWorkspace';
 import StudentGradesView from '@/components/StudentGradesView';
@@ -23,7 +23,7 @@ import {
   Users,
 } from 'lucide-react';
 
-export type TabType = 'workspace' | 'gradebook' | 'curriculum' | 'my-grades';
+export type { TabType } from '@/components/Sidebar';
 
 interface AppShellProps {
   initialCourseId?: string;
@@ -53,11 +53,6 @@ export default function AppShell({
   const [classes, setClasses] = useState<CohortClass[]>([]);
   const [cohortId, setCohortId] = useState<string>(initialCohortId || '');
 
-  // Management overview modals
-  const [showCourseMgmt, setShowCourseMgmt] = useState<boolean>(false);
-  const [showClassMgmt, setShowClassMgmt] = useState<boolean>(false);
-  const [showStudentMgmt, setShowStudentMgmt] = useState<boolean>(false);
-  const [studentMgmtCohortId, setStudentMgmtCohortId] = useState<string>('');
 
   // Create Course Modal state
   const [showNewCourseModal, setShowNewCourseModal] = useState<boolean>(false);
@@ -97,6 +92,12 @@ export default function AppShell({
     (cId: string, coId: string, tab: TabType) => {
       if (cId && coId && tab) {
         router.push(`/courses/${cId}/cohorts/${coId}/${tab}`);
+      } else if (tab === 'courses') {
+        router.push('/manage/courses');
+      } else if (tab === 'classes') {
+        router.push('/manage/classes');
+      } else if (tab === 'students') {
+        router.push('/manage/students');
       }
     },
     [router]
@@ -214,6 +215,10 @@ export default function AppShell({
     setActiveTab(newTab);
     if (selectedCourseId && cohortId) {
       navigateToView(selectedCourseId, cohortId, newTab);
+    } else {
+      if (newTab === 'courses') router.push('/manage/courses');
+      else if (newTab === 'classes') router.push('/manage/classes');
+      else if (newTab === 'students') router.push('/manage/students');
     }
   };
 
@@ -367,12 +372,9 @@ export default function AppShell({
           setClassError('');
           setShowNewClassModal(true);
         }}
-        onOpenCourseManagement={() => setShowCourseMgmt(true)}
-        onOpenClassManagement={() => setShowClassMgmt(true)}
-        onOpenStudentManagement={() => {
-          setStudentMgmtCohortId(cohortId);
-          setShowStudentMgmt(true);
-        }}
+        onOpenCourseManagement={() => handleTabChange('courses')}
+        onOpenClassManagement={() => handleTabChange('classes')}
+        onOpenStudentManagement={() => handleTabChange('students')}
       />
 
       {/* 2. Main Content & Workspace Column */}
@@ -417,6 +419,12 @@ export default function AppShell({
                 ? 'Cohort Gradebook'
                 : activeTab === 'curriculum'
                 ? 'Master Curriculum'
+                : activeTab === 'courses'
+                ? 'Master Course Management'
+                : activeTab === 'classes'
+                ? 'Class Sections Management'
+                : activeTab === 'students'
+                ? 'Student Roster Management'
                 : 'My Grades'}
             </span>
           </div>
@@ -425,31 +433,40 @@ export default function AppShell({
           {isTeacherOrTa && (
             <div className="flex items-center space-x-2 text-xs">
               <button
-                onClick={() => setShowCourseMgmt(true)}
-                className="px-2 py-1 text-[11px] text-ink-secondary hover:text-ink hover:bg-subtle rounded transition-colors flex items-center space-x-1"
-                title="Open Master Course Management"
+                onClick={() => handleTabChange('courses')}
+                className={`px-2 py-1 text-[11px] rounded transition-colors flex items-center space-x-1 ${
+                  activeTab === 'courses'
+                    ? 'bg-subtle text-ink font-medium border border-border'
+                    : 'text-ink-secondary hover:text-ink hover:bg-subtle'
+                }`}
+                title="Manage Master Courses"
               >
                 <FolderKanban className="w-3 h-3" />
                 <span className="hidden sm:inline">Courses</span>
               </button>
 
               <button
-                onClick={() => setShowClassMgmt(true)}
-                className="px-2 py-1 text-[11px] text-ink-secondary hover:text-ink hover:bg-subtle rounded transition-colors flex items-center space-x-1"
-                title="Open Class Section Management"
+                onClick={() => handleTabChange('classes')}
+                className={`px-2 py-1 text-[11px] rounded transition-colors flex items-center space-x-1 ${
+                  activeTab === 'classes'
+                    ? 'bg-subtle text-ink font-medium border border-border'
+                    : 'text-ink-secondary hover:text-ink hover:bg-subtle'
+                }`}
+                title="Manage Class Sections"
               >
                 <Layers className="w-3 h-3" />
                 <span className="hidden sm:inline">Classes</span>
               </button>
 
               <button
-                onClick={() => {
-                  setStudentMgmtCohortId(cohortId);
-                  setShowStudentMgmt(true);
-                }}
+                onClick={() => handleTabChange('students')}
                 data-testid="header-manage-students-btn"
-                className="px-2 py-1 text-[11px] text-ink-secondary hover:text-ink hover:bg-subtle rounded transition-colors flex items-center space-x-1"
-                title="Open Student Roster Management"
+                className={`px-2 py-1 text-[11px] rounded transition-colors flex items-center space-x-1 ${
+                  activeTab === 'students'
+                    ? 'bg-subtle text-ink font-medium border border-border'
+                    : 'text-ink-secondary hover:text-ink hover:bg-subtle'
+                }`}
+                title="Manage Student Rosters"
               >
                 <Users className="w-3 h-3" />
                 <span className="hidden sm:inline">Students</span>
@@ -460,6 +477,55 @@ export default function AppShell({
 
         {/* View Content Area */}
         <main className="flex-1 w-full overflow-hidden">
+          {activeTab === 'courses' && (
+            <CourseManagementView
+              courses={courses}
+              selectedCourseId={selectedCourseId}
+              onSelectCourse={handleSelectCourse}
+              onOpenCreateCourse={() => {
+                setCourseError('');
+                setShowNewCourseModal(true);
+              }}
+              onOpenCreateClass={() => {
+                setClassError('');
+                setShowNewClassModal(true);
+              }}
+              onClose={() => handleTabChange(isTeacherOrTa ? 'gradebook' : 'workspace')}
+            />
+          )}
+
+          {activeTab === 'classes' && (
+            <ClassManagementView
+              classes={classes}
+              selectedCohortId={cohortId}
+              courseTitle={selectedCourse?.title}
+              onSelectClass={handleSelectClass}
+              onOpenCreateClass={() => {
+                setClassError('');
+                setShowNewClassModal(true);
+              }}
+              onOpenStudentManagement={(cId) => {
+                if (cId) handleSelectClass(cId);
+                handleTabChange('students');
+              }}
+              onClose={() => handleTabChange(isTeacherOrTa ? 'gradebook' : 'workspace')}
+            />
+          )}
+
+          {activeTab === 'students' && (
+            <StudentManagementView
+              classes={classes}
+              selectedCohortId={cohortId}
+              onSelectClass={handleSelectClass}
+              onStudentsChanged={() => {
+                if (selectedCourseId) {
+                  fetchClassesForCourse(selectedCourseId, cohortId);
+                }
+              }}
+              onClose={() => handleTabChange(isTeacherOrTa ? 'gradebook' : 'workspace')}
+            />
+          )}
+
           {cohortId ? (
             <>
               {activeTab === 'workspace' && (
@@ -489,87 +555,44 @@ export default function AppShell({
               )}
             </>
           ) : (
-            <div className="h-full flex flex-col items-center justify-center space-y-3 p-6 text-center">
-              <BookOpen className="w-8 h-8 text-ink-secondary" />
-              <div className="text-sm font-semibold text-ink">
-                {courses.length === 0 ? 'No Master Courses Available' : 'No Classes in this Course'}
-              </div>
-              <p className="text-xs text-ink-secondary max-w-sm">
-                {isTeacherOrTa
-                  ? 'Create a new course or add a semester class section to begin authoring and grading.'
-                  : 'You are not currently enrolled in any active classes for this course.'}
-              </p>
-              {isTeacherOrTa && (
-                <div className="flex items-center space-x-2 pt-2">
-                  <button
-                    onClick={() => setShowNewCourseModal(true)}
-                    className="px-3 py-1.5 text-xs bg-ink text-white rounded hover:bg-ink-secondary transition-colors flex items-center space-x-1.5"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Create Course</span>
-                  </button>
-                  {selectedCourseId && (
-                    <button
-                      onClick={() => setShowNewClassModal(true)}
-                      className="px-3 py-1.5 text-xs border border-border bg-subtle text-ink rounded hover:bg-active transition-colors flex items-center space-x-1.5"
-                    >
-                      <Calendar className="w-3.5 h-3.5" />
-                      <span>Add Class</span>
-                    </button>
-                  )}
+            activeTab !== 'courses' &&
+            activeTab !== 'classes' &&
+            activeTab !== 'students' && (
+              <div className="h-full flex flex-col items-center justify-center space-y-3 p-6 text-center">
+                <BookOpen className="w-8 h-8 text-ink-secondary" />
+                <div className="text-sm font-semibold text-ink">
+                  {courses.length === 0 ? 'No Master Courses Available' : 'No Classes in this Course'}
                 </div>
-              )}
-            </div>
+                <p className="text-xs text-ink-secondary max-w-sm">
+                  {isTeacherOrTa
+                    ? 'Create a new course or add a semester class section to begin authoring and grading.'
+                    : 'You are not currently enrolled in any active classes for this course.'}
+                </p>
+                {isTeacherOrTa && (
+                  <div className="flex items-center space-x-2 pt-2">
+                    <button
+                      onClick={() => setShowNewCourseModal(true)}
+                      className="px-3 py-1.5 text-xs bg-ink text-white rounded hover:bg-ink-secondary transition-colors flex items-center space-x-1.5"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Create Course</span>
+                    </button>
+                    {selectedCourseId && (
+                      <button
+                        onClick={() => setShowNewClassModal(true)}
+                        className="px-3 py-1.5 text-xs border border-border bg-subtle text-ink rounded hover:bg-active transition-colors flex items-center space-x-1.5"
+                      >
+                        <Calendar className="w-3.5 h-3.5" />
+                        <span>Add Class</span>
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )
           )}
         </main>
       </div>
-
-      {/* 3. Management Modals */}
-      <CourseManagementModal
-        isOpen={showCourseMgmt}
-        onClose={() => setShowCourseMgmt(false)}
-        courses={courses}
-        selectedCourseId={selectedCourseId}
-        onSelectCourse={handleSelectCourse}
-        onOpenCreateCourse={() => {
-          setCourseError('');
-          setShowNewCourseModal(true);
-        }}
-        onOpenCreateClass={() => {
-          setClassError('');
-          setShowNewClassModal(true);
-        }}
-      />
-
-      <ClassManagementModal
-        isOpen={showClassMgmt}
-        onClose={() => setShowClassMgmt(false)}
-        classes={classes}
-        selectedCohortId={cohortId}
-        onSelectClass={handleSelectClass}
-        onOpenCreateClass={() => {
-          setClassError('');
-          setShowNewClassModal(true);
-        }}
-        onOpenStudentManagement={(cId) => {
-          setStudentMgmtCohortId(cId || cohortId);
-          setShowStudentMgmt(true);
-        }}
-      />
-
-      {/* Student Roster & Enrollment Management Modal */}
-      <StudentManagementModal
-        isOpen={showStudentMgmt}
-        onClose={() => setShowStudentMgmt(false)}
-        classes={classes}
-        selectedCohortId={studentMgmtCohortId || cohortId}
-        onSelectClass={handleSelectClass}
-        onStudentsChanged={() => {
-          if (selectedCourseId) {
-            fetchClassesForCourse(selectedCourseId, cohortId);
-          }
-        }}
-      />
 
       {/* 4. Modal: Create Master Course */}
       {showNewCourseModal && (

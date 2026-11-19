@@ -28,10 +28,17 @@ export async function runMigrations() {
             'ddl_schema',
             'seed_transformation',
             'analytics_query',
+            'python_analytics',
+            'python_modeling',
+            'hybrid_sql_python',
             'midterm_exam',
             'capstone_project',
             'final_exam'
           );
+        ELSE
+          ALTER TYPE assignment_type ADD VALUE IF NOT EXISTS 'python_analytics';
+          ALTER TYPE assignment_type ADD VALUE IF NOT EXISTS 'python_modeling';
+          ALTER TYPE assignment_type ADD VALUE IF NOT EXISTS 'hybrid_sql_python';
         END IF;
         IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'submission_status') THEN
           CREATE TYPE submission_status AS ENUM (
@@ -157,10 +164,15 @@ export async function runMigrations() {
         title VARCHAR(255) NOT NULL,
         slug VARCHAR(255) UNIQUE NOT NULL,
         type assignment_type NOT NULL,
+        language VARCHAR(20) NOT NULL DEFAULT 'sql',
         business_case_markdown TEXT NOT NULL,
         starter_sql TEXT,
         solution_sql TEXT,
-        verification_sql TEXT NOT NULL,
+        verification_sql TEXT,
+        starter_python TEXT,
+        solution_python TEXT,
+        verification_python TEXT,
+        dataset_config JSONB DEFAULT '{}'::JSONB,
         max_score NUMERIC(5, 2) NOT NULL DEFAULT 100.00,
         weight_percentage NUMERIC(5, 2) NOT NULL DEFAULT 0.00,
         rubric_criteria JSONB NOT NULL DEFAULT '[]'::JSONB,
@@ -168,7 +180,14 @@ export async function runMigrations() {
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
+      ALTER TABLE master_assignments ADD COLUMN IF NOT EXISTS language VARCHAR(20) NOT NULL DEFAULT 'sql';
+      ALTER TABLE master_assignments ADD COLUMN IF NOT EXISTS starter_python TEXT;
+      ALTER TABLE master_assignments ADD COLUMN IF NOT EXISTS solution_python TEXT;
+      ALTER TABLE master_assignments ADD COLUMN IF NOT EXISTS verification_python TEXT;
+      ALTER TABLE master_assignments ADD COLUMN IF NOT EXISTS dataset_config JSONB DEFAULT '{}'::JSONB;
+      ALTER TABLE master_assignments ALTER COLUMN verification_sql DROP NOT NULL;
       CREATE INDEX IF NOT EXISTS idx_master_assignments_module ON master_assignments(module_id);
+      CREATE INDEX IF NOT EXISTS idx_master_assignments_language ON master_assignments(language);
     `);
 
     // 4. Cohort Assignments
@@ -194,10 +213,12 @@ export async function runMigrations() {
         cohort_assignment_id UUID NOT NULL REFERENCES cohort_assignments(id) ON DELETE CASCADE,
         student_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         version INT NOT NULL DEFAULT 1,
-        submitted_sql TEXT NOT NULL,
+        submitted_sql TEXT,
+        submitted_python TEXT,
         erd_diagram_json JSONB,
         execution_status submission_status NOT NULL DEFAULT 'draft',
         execution_output JSONB,
+        execution_artifacts JSONB DEFAULT '{}'::JSONB,
         verification_score NUMERIC(5, 2),
         final_score NUMERIC(5, 2),
         teacher_feedback TEXT,
@@ -206,6 +227,9 @@ export async function runMigrations() {
         graded_at TIMESTAMPTZ,
         UNIQUE (cohort_assignment_id, student_id, version)
       );
+      ALTER TABLE submissions ADD COLUMN IF NOT EXISTS submitted_python TEXT;
+      ALTER TABLE submissions ADD COLUMN IF NOT EXISTS execution_artifacts JSONB DEFAULT '{}'::JSONB;
+      ALTER TABLE submissions ALTER COLUMN submitted_sql DROP NOT NULL;
       CREATE INDEX IF NOT EXISTS idx_submissions_assignment_student ON submissions(cohort_assignment_id, student_id);
       CREATE INDEX IF NOT EXISTS idx_submissions_status ON submissions(execution_status);
     `);

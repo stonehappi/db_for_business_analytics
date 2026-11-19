@@ -53,6 +53,25 @@ services:
       timeout: 3s
       retries: 10
 
+  python-sandbox:
+    build:
+      context: ./docker/python-runner
+      dockerfile: Dockerfile
+    container_name: db_platform_python_sandbox
+    restart: unless-stopped
+    ports:
+      - "${PYTHON_RUNNER_PORT:-8000}:8000"
+    environment:
+      - SANDBOX_STUDENT_DATABASE_URL=postgresql://student_sandbox_user:sandbox_safe_pw@postgres-sandbox:5432/sandbox_db
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    depends_on:
+      postgres-sandbox:
+        condition: service_healthy
+
   web:
     build:
       context: .
@@ -68,6 +87,7 @@ services:
       - DATABASE_URL=postgresql://postgres:postgres@postgres-app:5432/app_db
       - SANDBOX_ADMIN_DATABASE_URL=postgresql://postgres:postgres@postgres-sandbox:5432/sandbox_db
       - SANDBOX_STUDENT_DATABASE_URL=postgresql://student_sandbox_user:sandbox_safe_pw@postgres-sandbox:5432/sandbox_db
+      - PYTHON_RUNNER_URL=http://python-sandbox:8000
       - JWT_SECRET=${JWT_SECRET:-antigravity-secure-jwt-secret-key-production-2026-business-analytics}
       - AUTO_MIGRATE=true
       - AUTO_SEED=true
@@ -75,6 +95,8 @@ services:
       postgres-app:
         condition: service_healthy
       postgres-sandbox:
+        condition: service_healthy
+      python-sandbox:
         condition: service_healthy
 
 volumes:

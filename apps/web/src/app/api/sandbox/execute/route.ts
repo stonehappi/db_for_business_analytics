@@ -1,22 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { executeSandboxQuery } from '@db-platform/sandbox';
+import { executeSandboxQuery, executePythonSandbox } from '@db-platform/sandbox';
 import { queryApp } from '@db-platform/db';
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { cohortAssignmentId, masterAssignmentId, sqlCode } = body;
+    const { cohortAssignmentId, masterAssignmentId, sqlCode, pythonCode, code, language, verificationCode } = body;
 
-    if (!sqlCode || typeof sqlCode !== 'string') {
-      return NextResponse.json({ error: 'sqlCode is required' }, { status: 400 });
+    const effectiveCode = pythonCode || sqlCode || code;
+    if (!effectiveCode || typeof effectiveCode !== 'string') {
+      return NextResponse.json({ error: 'code (sqlCode or pythonCode) is required' }, { status: 400 });
     }
 
-    let verificationSql: string | null = null;
+    let assignmentMeta: {
+      language?: string;
+      verification_sql?: string | null;
+      verification_python?: string | null;
+    } | null = null;
 
     if (cohortAssignmentId) {
       const res = await queryApp(
         `
-        SELECT ma.verification_sql
+        SELECT ma.language, ma.verification_sql, ma.verification_python
         FROM cohort_assignments ca
         JOIN master_assignments ma ON ca.master_assignment_id = ma.id
         WHERE ca.id = $1;
@@ -24,24 +29,41 @@ export async function POST(req: NextRequest) {
         [cohortAssignmentId]
       );
       if (res.rowCount > 0) {
-        verificationSql = res.rows[0].verification_sql;
+        assignmentMeta = res.rows[0];
       }
     } else if (masterAssignmentId) {
       const res = await queryApp(
         `
-        SELECT verification_sql
+        SELECT language, verification_sql, verification_python
         FROM master_assignments
         WHERE id = $1;
       `,
         [masterAssignmentId]
       );
       if (res.rowCount > 0) {
-        verificationSql = res.rows[0].verification_sql;
+        assignmentMeta = res.rows[0];
       }
     }
 
-    const result = await executeSandboxQuery(sqlCode, verificationSql);
-    return NextResponse.json(result);
+    const effectiveLanguage = (
+      language ||
+      (pythonCode ? 'python' : sqlCode ? 'sql' : assignmentMeta?.language) ||
+      'sql'
+    ).toLowerCase();
+
+    if (effectiveLanguage === 'python') {
+      const result = await executePythonSandbox(
+        effectiveCode,
+        verificationCode || assignmentMeta?.verification_python
+      );
+      return NextResponse.json(result);
+    } else {
+      const result = await executeSandboxQuery(
+        effectiveCode,
+        verificationCode || assignmentMeta?.verification_sql
+      );
+      return NextResponse.json(result);
+    }
   } catch (err: any) {
     return NextResponse.json(
       {

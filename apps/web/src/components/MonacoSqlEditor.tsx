@@ -9,6 +9,7 @@ interface MonacoSqlEditorProps {
   onRun?: () => void;
   readOnly?: boolean;
   height?: string;
+  language?: string;
 }
 
 export default function MonacoSqlEditor({
@@ -17,6 +18,7 @@ export default function MonacoSqlEditor({
   onRun,
   readOnly = false,
   height = '100%',
+  language = 'sql',
 }: MonacoSqlEditorProps) {
   const handleEditorDidMount: OnMount = (editor, monaco) => {
     if (onRun) {
@@ -30,7 +32,7 @@ export default function MonacoSqlEditor({
     <div className="w-full h-full border-t border-border overflow-hidden bg-white">
       <Editor
         height={height}
-        language="sql"
+        language={language}
         theme="vs-light"
         value={value}
         onChange={(val) => onChange(val || '')}

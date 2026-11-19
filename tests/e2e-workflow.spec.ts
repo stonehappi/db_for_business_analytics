@@ -307,6 +307,8 @@ test.describe('Database Learning Platform & Project Management E2E', () => {
     // 2. Switch to BA-201 Data Warehousing
     const ba201Val = await courseSelector.locator('option', { hasText: 'BA-201' }).getAttribute('value');
     await courseSelector.selectOption(ba201Val!);
+    await expect(courseSelector).toHaveValue(ba201Val!);
+    await page.waitForURL(new RegExp(`/courses/${ba201Val}`), { timeout: 5000 });
 
     // Verify classes for BA-201 are loaded in class selector
     await expect(classSelector).toContainText('DW-2026-FALL-A');
@@ -314,9 +316,12 @@ test.describe('Database Learning Platform & Project Management E2E', () => {
     // 3. Switch back to BA-101 Relational DB Design
     const ba101Val = await courseSelector.locator('option', { hasText: 'BA-101' }).getAttribute('value');
     await courseSelector.selectOption(ba101Val!);
+    await expect(courseSelector).toHaveValue(ba101Val!);
+    await page.waitForURL(new RegExp(`/courses/${ba101Val}`), { timeout: 5000 });
     await expect(classSelector).toContainText('BA-2026-FALL-A');
     await expect(classSelector).toContainText('BA-2026-FALL-B');
     await expect(classSelector).toContainText('BA-2027-SPRING-A');
+    await expect(page.getByText('(BA-2026-FALL-A)')).toBeVisible({ timeout: 5000 });
 
     // Switch between semester cohorts within BA-101
     const fallBVal = await classSelector.locator('option', { hasText: 'BA-2026-FALL-B' }).getAttribute('value');
@@ -649,6 +654,71 @@ test.describe('Database Learning Platform & Project Management E2E', () => {
     await page.goto(workspacePath);
     await page.waitForURL(workspacePath, { timeout: 5000 });
     await expect(page.locator('text=Assignment Scenario')).toBeVisible();
+  });
+
+  test('13. Full-Body Management Routes: Manage Courses, Classes, and Students on new dedicated routes without dialog overlays; forms remain in modal dialogs', async ({ page }) => {
+    await loginAs(page, 'prof.smith@uni.edu');
+
+    // 1. Manage Courses: Navigate via Sidebar to new route
+    const btnManageCourses = page.locator('[data-testid="btn-manage-courses"]');
+    await expect(btnManageCourses).toBeVisible();
+    await btnManageCourses.click();
+
+    await page.waitForURL(/(manage\/courses|\/courses\/.+\/cohorts\/.+\/courses)/, { timeout: 5000 });
+    // Verify it is full-body (page header visible with Full Page badge, not a dialog backdrop overlay)
+    await expect(page.locator('h1 >> text=Master Course Management')).toBeVisible();
+    await expect(page.locator('span:has-text("Full Page")').first()).toBeVisible();
+    await expect(page.locator('text=total Master Courses defined in platform')).toBeVisible();
+
+    // Verify form is in dialog modal: Click New Master Course
+    await page.locator('[data-testid="modal-create-course-btn"]').click();
+    const createCourseModal = page.locator('[data-testid="create-course-modal"]');
+    await expect(createCourseModal).toBeVisible();
+    await expect(createCourseModal.locator('[data-testid="course-code-input"]')).toBeVisible();
+    // Cancel form dialog
+    await createCourseModal.locator('button:has-text("Cancel")').click();
+    await expect(createCourseModal).not.toBeVisible();
+
+    // 2. Manage Classes: Navigate via Sidebar to new route
+    const btnManageClasses = page.locator('[data-testid="btn-manage-classes"]');
+    await expect(btnManageClasses).toBeVisible();
+    await btnManageClasses.click();
+
+    await page.waitForURL(/(manage\/classes|\/courses\/.+\/cohorts\/.+\/classes)/, { timeout: 5000 });
+    await expect(page.locator('h1 >> text=Class Sections & Semesters Management')).toBeVisible();
+    await expect(page.locator('text=total Class Sections')).toBeVisible();
+
+    // Verify form is in dialog modal: Click Add Class Section
+    await page.locator('[data-testid="modal-create-class-btn"]').click();
+    const createClassModal = page.locator('[data-testid="create-class-modal"]');
+    await expect(createClassModal).toBeVisible();
+    await expect(createClassModal.locator('[data-testid="class-code-input"]')).toBeVisible();
+    // Cancel form dialog
+    await createClassModal.locator('button:has-text("Cancel")').click();
+    await expect(createClassModal).not.toBeVisible();
+
+    // 3. Manage Students: Navigate via Sidebar to new route
+    const btnManageStudents = page.locator('[data-testid="btn-manage-students"]');
+    await expect(btnManageStudents).toBeVisible();
+    await btnManageStudents.click();
+
+    await page.waitForURL(/(manage\/students|\/courses\/.+\/cohorts\/.+\/students)/, { timeout: 5000 });
+    await expect(page.locator('h1 >> text=Student Roster & Cohort Management')).toBeVisible();
+    await expect(page.locator('[data-testid="search-students-input"]')).toBeVisible();
+    await expect(page.locator('[data-testid="btn-export-students"]')).toBeVisible();
+
+    // 4. Test Top-level direct route navigation: /manage/courses, /manage/classes, /manage/students
+    await page.goto('/manage/courses');
+    await page.waitForURL(/\/manage\/courses/, { timeout: 5000 });
+    await expect(page.locator('h1 >> text=Master Course Management')).toBeVisible();
+
+    await page.goto('/manage/classes');
+    await page.waitForURL(/\/manage\/classes/, { timeout: 5000 });
+    await expect(page.locator('h1 >> text=Class Sections & Semesters Management')).toBeVisible();
+
+    await page.goto('/manage/students');
+    await page.waitForURL(/\/manage\/students/, { timeout: 5000 });
+    await expect(page.locator('h1 >> text=Student Roster & Cohort Management')).toBeVisible();
   });
 
 });

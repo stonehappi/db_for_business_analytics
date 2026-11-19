@@ -18,12 +18,16 @@ export interface WeeklyCurriculumItem {
     title: string;
     slug: string;
     type: string;
+    language?: string;
     maxScore: number;
     weightPercentage: number;
     businessCase: string;
-    starterSql: string;
-    solutionSql: string;
-    verificationSql: string;
+    starterSql?: string;
+    solutionSql?: string;
+    verificationSql?: string;
+    starterPython?: string;
+    solutionPython?: string;
+    verificationPython?: string;
     rubric: { criterion: string; points: number }[];
   };
 }
@@ -565,7 +569,95 @@ CREATE TABLE employees (
         correctIndex: 1,
         explanation: 'A data dictionary serves as the single source of truth describing every entity, attribute grain, allowed value ranges, and relationship constraints.'
       }
-    ]
+    ],
+    project: {
+      id: 'c1f2e3d4-1111-4444-8888-000000000103',
+      title: 'Week 3 Python Lab: Exploratory Data Analysis & Customer Spend in Pandas',
+      slug: 'w3-project-python-eda',
+      type: 'python_analytics',
+      language: 'python',
+      maxScore: 100,
+      weightPercentage: 5,
+      businessCase: `# Business Case: Retail Customer Transaction EDA & Spend Modeling
+
+## Context
+"OmniRetail" requires a Python business analytics script to inspect transaction hygiene, extract customer orders from PostgreSQL, merge line items, compute total customer revenue, and visualize customer spend distributions.
+
+## Tasks:
+1. Connect to PostgreSQL using the injected \`conn\` engine and extract tables:
+   - \`customers\`
+   - \`orders\`
+   - \`order_items\`
+2. Compute line net total: \`net_total = quantity * (unit_price - discount)\`.
+3. Aggregate to create an \`order_summary\` DataFrame with columns:
+   - \`order_id\`, \`customer_id\`, \`total_revenue\`
+4. Create a Matplotlib bar chart showing total revenue per customer.`,
+      starterPython: `# Week 3 Python Analytics Lab
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+# 1. Query database tables via injected connection 'conn'
+df_customers = pd.read_sql("SELECT * FROM customers", conn)
+df_orders = pd.read_sql("SELECT * FROM orders", conn)
+df_items = pd.read_sql("SELECT * FROM order_items", conn)
+
+# 2. Compute net line item revenue and aggregate per order into 'order_summary'
+# Columns required in order_summary: 'order_id', 'customer_id', 'total_revenue'
+df_items['net_total'] = df_items['quantity'] * (df_items['unit_price'] - df_items['discount'])
+order_rev = df_items.groupby('order_id')['net_total'].sum().reset_index()
+order_rev.rename(columns={'net_total': 'total_revenue'}, inplace=True)
+
+order_summary = pd.merge(df_orders, order_rev, left_on='id', right_on='order_id')
+order_summary = order_summary[['id', 'customer_id', 'total_revenue']].rename(columns={'id': 'order_id'})
+
+# 3. Generate visualization of customer total spend
+cust_spend = order_summary.groupby('customer_id')['total_revenue'].sum()
+
+plt.figure(figsize=(6, 4))
+cust_spend.plot(kind='bar', color='#18181B')
+plt.title('Total Revenue by Customer')
+plt.xlabel('Customer ID')
+plt.ylabel('Revenue ($)')
+plt.tight_layout()
+`,
+      solutionPython: `import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+df_customers = pd.read_sql("SELECT * FROM customers", conn)
+df_orders = pd.read_sql("SELECT * FROM orders", conn)
+df_items = pd.read_sql("SELECT * FROM order_items", conn)
+
+df_items['net_total'] = df_items['quantity'] * (df_items['unit_price'] - df_items['discount'])
+order_rev = df_items.groupby('order_id')['net_total'].sum().reset_index()
+order_rev.rename(columns={'net_total': 'total_revenue'}, inplace=True)
+
+order_summary = pd.merge(df_orders, order_rev, left_on='id', right_on='order_id')
+order_summary = order_summary[['id', 'customer_id', 'total_revenue']].rename(columns={'id': 'order_id'})
+
+cust_spend = order_summary.groupby('customer_id')['total_revenue'].sum()
+
+plt.figure(figsize=(6, 4))
+cust_spend.plot(kind='bar', color='#18181B')
+plt.title('Total Revenue by Customer')
+plt.xlabel('Customer ID')
+plt.ylabel('Revenue ($)')
+plt.tight_layout()
+`,
+      verificationPython: `assert 'order_summary' in locals(), "Expected DataFrame 'order_summary' to be created"
+assert isinstance(order_summary, pd.DataFrame), "'order_summary' must be a pandas DataFrame"
+for col in ['order_id', 'customer_id', 'total_revenue']:
+    assert col in order_summary.columns, f"Missing required column '{col}' in order_summary"
+assert len(order_summary) >= 6, f"Expected at least 6 orders in order_summary, found {len(order_summary)}"
+assert order_summary['total_revenue'].sum() > 1000, "Calculated total revenue is too low"
+`,
+      rubric: [
+        { criterion: 'Clean database extraction using pandas.read_sql', points: 30 },
+        { criterion: 'Accurate net line-item calculation and aggregation', points: 40 },
+        { criterion: 'Matplotlib chart figure generation', points: 30 }
+      ]
+    }
   },
 
   // WEEKS 4 TO 16 (We will populate similarly rich pedagogical slides & quizzes for all weeks)
@@ -1669,7 +1761,111 @@ ORDER BY gross_revenue DESC;`,
         correctIndex: 1,
         explanation: 'One dimension record (e.g. one Product) associates with many transaction records (Many Fact rows) over time: a 1:M relationship.'
       }
-    ]
+    ],
+    project: {
+      id: 'c1f2e3d4-1111-4444-8888-000000000111',
+      title: 'Week 11 Python Project: E-Commerce RFM Customer Segmentation & Behavioral Scatter',
+      slug: 'w11-project-rfm-segmentation',
+      type: 'python_analytics',
+      language: 'python',
+      maxScore: 100,
+      weightPercentage: 5,
+      businessCase: `# Business Case: Customer RFM Segmentation & Valuation Modeling
+
+## Context
+"OmniRetail" wants to classify customer accounts using RFM (Recency, Frequency, Monetary) analytics to target high-value buyers and reactivate churned customers.
+
+## Tasks:
+1. Join \`customers\`, \`orders\`, and \`order_items\` via PostgreSQL read query.
+2. Group by \`customer_id\` and compute:
+   - \`recency\`: Number of days from the customer's latest order to reference date \`2026-11-15\`.
+   - \`frequency\`: Total unique orders per customer.
+   - \`monetary\`: Total spend per customer (sum of \`quantity * (unit_price - discount)\`).
+3. Store in variable \`rfm_df\` with columns: \`customer_id\`, \`recency\`, \`frequency\`, \`monetary\`.
+4. Generate a Matplotlib scatter plot of Recency vs Monetary spend.`,
+      starterPython: `# Week 11 Python Analytics Project: RFM Customer Segmentation
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+# 1. Extract unified transaction dataset from PostgreSQL
+query = """
+SELECT 
+    c.id AS customer_id,
+    c.full_name,
+    o.id AS order_id,
+    o.order_date,
+    oi.quantity * (oi.unit_price - oi.discount) AS item_spend
+FROM customers c
+JOIN orders o ON c.id = o.customer_id
+JOIN order_items oi ON o.id = oi.order_id
+"""
+df_transactions = pd.read_sql(query, conn)
+df_transactions['order_date'] = pd.to_datetime(df_transactions['order_date'])
+
+# 2. Compute RFM dataframe 'rfm_df' relative to '2026-11-15'
+ref_date = pd.to_datetime('2026-11-15', utc=True)
+rfm_df = df_transactions.groupby('customer_id').agg(
+    recency=('order_date', lambda d: int((ref_date - d.max()).total_seconds() // 86400)),
+    frequency=('order_id', 'nunique'),
+    monetary=('item_spend', 'sum')
+).reset_index()
+
+# 3. Plot Recency vs Monetary scatter visualization
+plt.figure(figsize=(6, 4))
+plt.scatter(rfm_df['recency'], rfm_df['monetary'], s=rfm_df['frequency'] * 50, color='#2563EB', alpha=0.7)
+plt.title('Customer Recency vs Monetary Spend')
+plt.xlabel('Recency (Days)')
+plt.ylabel('Monetary ($)')
+plt.grid(True, linestyle='--', alpha=0.5)
+plt.tight_layout()
+`,
+      solutionPython: `import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+query = """
+SELECT 
+    c.id AS customer_id,
+    c.full_name,
+    o.id AS order_id,
+    o.order_date,
+    oi.quantity * (oi.unit_price - oi.discount) AS item_spend
+FROM customers c
+JOIN orders o ON c.id = o.customer_id
+JOIN order_items oi ON o.id = oi.order_id
+"""
+df_transactions = pd.read_sql(query, conn)
+df_transactions['order_date'] = pd.to_datetime(df_transactions['order_date'])
+
+ref_date = pd.to_datetime('2026-11-15', utc=True)
+rfm_df = df_transactions.groupby('customer_id').agg(
+    recency=('order_date', lambda d: int((ref_date - d.max()).total_seconds() // 86400)),
+    frequency=('order_id', 'nunique'),
+    monetary=('item_spend', 'sum')
+).reset_index()
+
+plt.figure(figsize=(6, 4))
+plt.scatter(rfm_df['recency'], rfm_df['monetary'], s=rfm_df['frequency'] * 50, color='#2563EB', alpha=0.7)
+plt.title('Customer Recency vs Monetary Spend')
+plt.xlabel('Recency (Days)')
+plt.ylabel('Monetary ($)')
+plt.grid(True, linestyle='--', alpha=0.5)
+plt.tight_layout()
+`,
+      verificationPython: `assert 'rfm_df' in locals(), "Expected DataFrame 'rfm_df' to be created"
+assert isinstance(rfm_df, pd.DataFrame), "'rfm_df' must be a pandas DataFrame"
+for col in ['customer_id', 'recency', 'frequency', 'monetary']:
+    assert col in rfm_df.columns, f"Missing required column '{col}' in rfm_df"
+assert len(rfm_df) == 5, f"Expected 5 customer RFM rows, found {len(rfm_df)}"
+assert rfm_df['monetary'].sum() > 1000, "Monetary sum did not match expected business total"
+`,
+      rubric: [
+        { criterion: 'Relational Star Schema query joining orders and items', points: 30 },
+        { criterion: 'Accurate Recency, Frequency, Monetary calculation in Pandas', points: 40 },
+        { criterion: 'RFM distribution visualization generated', points: 30 }
+      ]
+    }
   },
 
   // WEEK 12
