@@ -11,6 +11,8 @@ import StudentWorkspace from '@/components/StudentWorkspace';
 import StudentGradesView from '@/components/StudentGradesView';
 import GradebookMatrix from '@/components/GradebookMatrix';
 import CurriculumView from '@/components/CurriculumView';
+import McpConnectionModal from '@/components/McpConnectionModal';
+import { useDialog } from '@/components/Dialog';
 import {
   BookOpen,
   Calendar,
@@ -21,6 +23,8 @@ import {
   FolderKanban,
   Layers,
   Users,
+  Sparkles,
+  Trash2,
 } from 'lucide-react';
 
 export type { TabType } from '@/components/Sidebar';
@@ -69,6 +73,11 @@ export default function AppShell({
   const [newClassTerm, setNewClassTerm] = useState<string>('Fall 2026');
   const [classError, setClassError] = useState<string>('');
   const [isSubmittingClass, setIsSubmittingClass] = useState<boolean>(false);
+
+  // MCP AI Connection Modal state
+  const [showMcpModal, setShowMcpModal] = useState<boolean>(false);
+
+  const { confirm, alert } = useDialog();
 
   // Sync state with URL params when navigating or using browser Back/Forward
   useEffect(() => {
@@ -335,6 +344,60 @@ export default function AppShell({
     }
   };
 
+  // Delete Master Course
+  const handleDeleteCourse = async (course: Course) => {
+    const ok = await confirm({
+      title: `Delete Master Course ${course.code}?`,
+      message: `Are you sure you want to permanently delete "${course.code} - ${course.title}"? This will delete all 16 syllabus modules, project assignments, and all attached class cohorts. This action cannot be undone.`,
+      confirmText: 'Delete Course',
+      confirmTestId: 'confirm-delete-course-btn',
+      variant: 'danger',
+    });
+    if (!ok) return;
+
+    try {
+      const res = await fetch(`/api/courses?id=${course.id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok) {
+        await alert({ title: 'Error', message: data.error || 'Failed to delete course' });
+        return;
+      }
+      const result = await fetchCoursesAndData();
+      if (result.courseId && result.cohortId) {
+        navigateToView(result.courseId, result.cohortId, activeTab);
+      }
+    } catch (err: any) {
+      await alert({ title: 'Error', message: err.message || 'Error deleting course' });
+    }
+  };
+
+  // Delete Class Section
+  const handleDeleteClass = async (cls: CohortClass) => {
+    const ok = await confirm({
+      title: `Delete Class Section ${cls.code}?`,
+      message: `Are you sure you want to delete Class Section "${cls.code}" (${cls.name})? All student enrollments, submissions, and grades in this section will be permanently deleted.`,
+      confirmText: 'Delete Class',
+      confirmTestId: 'confirm-delete-class-btn',
+      variant: 'danger',
+    });
+    if (!ok) return;
+
+    try {
+      const res = await fetch(`/api/cohorts?id=${cls.id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok) {
+        await alert({ title: 'Error', message: data.error || 'Failed to delete class' });
+        return;
+      }
+      const nextCohortId = await fetchClassesForCourse(selectedCourseId);
+      if (selectedCourseId && nextCohortId) {
+        navigateToView(selectedCourseId, nextCohortId, activeTab);
+      }
+    } catch (err: any) {
+      await alert({ title: 'Error', message: err.message || 'Error deleting class' });
+    }
+  };
+
   if (!currentUser) {
     return (
       <div className="h-screen w-screen flex items-center justify-center bg-canvas text-xs text-ink-secondary">
@@ -375,6 +438,7 @@ export default function AppShell({
         onOpenCourseManagement={() => handleTabChange('courses')}
         onOpenClassManagement={() => handleTabChange('classes')}
         onOpenStudentManagement={() => handleTabChange('students')}
+        onOpenMcpModal={() => setShowMcpModal(true)}
       />
 
       {/* 2. Main Content & Workspace Column */}
@@ -471,6 +535,16 @@ export default function AppShell({
                 <Users className="w-3 h-3" />
                 <span className="hidden sm:inline">Students</span>
               </button>
+
+              <button
+                onClick={() => setShowMcpModal(true)}
+                data-testid="header-open-mcp-btn"
+                className="px-2 py-1 text-[11px] rounded transition-colors flex items-center space-x-1 text-amber-800 hover:bg-amber-50 border border-amber-200"
+                title="AI & MCP Connection with Key"
+              >
+                <Sparkles className="w-3 h-3 text-amber-600" />
+                <span className="hidden sm:inline">AI / MCP</span>
+              </button>
             </div>
           )}
         </header>
@@ -490,6 +564,8 @@ export default function AppShell({
                 setClassError('');
                 setShowNewClassModal(true);
               }}
+              onDeleteCourse={handleDeleteCourse}
+              onOpenMcpModal={() => setShowMcpModal(true)}
               onClose={() => handleTabChange(isTeacherOrTa ? 'gradebook' : 'workspace')}
             />
           )}
@@ -508,6 +584,7 @@ export default function AppShell({
                 if (cId) handleSelectClass(cId);
                 handleTabChange('students');
               }}
+              onDeleteClass={handleDeleteClass}
               onClose={() => handleTabChange(isTeacherOrTa ? 'gradebook' : 'workspace')}
             />
           )}
@@ -772,6 +849,12 @@ export default function AppShell({
           </div>
         </div>
       )}
+
+      {/* 6. Modal: AI & MCP Connection with Key */}
+      <McpConnectionModal
+        isOpen={showMcpModal}
+        onClose={() => setShowMcpModal(false)}
+      />
     </div>
   );
 }

@@ -338,7 +338,7 @@ export default function StudentManagementView({
       data-testid="student-management-modal"
       className="h-[calc(100vh-2.75rem)] overflow-y-auto bg-canvas font-sans select-none"
     >
-      <div className="max-w-6xl mx-auto p-4 sm:p-6 space-y-5">
+      <div className="w-full p-4 sm:p-6 space-y-5">
         {/* Header Banner */}
         <div className="bg-surface border border-border rounded-lg p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-2xs">
           <div className="flex items-center space-x-3.5">

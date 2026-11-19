@@ -166,3 +166,39 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const user = await getSessionUser(req);
+    if (!user || (user.role !== 'teacher' && user.role !== 'admin')) {
+      return NextResponse.json(
+        { error: 'Forbidden: Only teachers can delete master modules' },
+        { status: 403 }
+      );
+    }
+
+    const url = new URL(req.url);
+    const id = url.searchParams.get('id');
+
+    if (!id) {
+      return NextResponse.json({ error: 'Module id is required' }, { status: 400 });
+    }
+
+    const res = await queryApp(
+      `DELETE FROM master_modules WHERE id = $1 RETURNING id, title, week_number;`,
+      [id]
+    );
+
+    if (res.rowCount === 0) {
+      return NextResponse.json({ error: 'Module not found' }, { status: 404 });
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: `Module ${res.rows[0].title} deleted`,
+      deletedModule: res.rows[0],
+    });
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
+}

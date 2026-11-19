@@ -31,7 +31,9 @@ export async function POST(req: NextRequest) {
       if (res.rowCount > 0) {
         assignmentMeta = res.rows[0];
       }
-    } else if (masterAssignmentId) {
+    }
+
+    if (!assignmentMeta && masterAssignmentId) {
       const res = await queryApp(
         `
         SELECT language, verification_sql, verification_python
@@ -39,6 +41,20 @@ export async function POST(req: NextRequest) {
         WHERE id = $1;
       `,
         [masterAssignmentId]
+      );
+      if (res.rowCount > 0) {
+        assignmentMeta = res.rows[0];
+      }
+    }
+
+    if (!assignmentMeta && cohortAssignmentId) {
+      const res = await queryApp(
+        `
+        SELECT language, verification_sql, verification_python
+        FROM master_assignments
+        WHERE id = $1;
+      `,
+        [cohortAssignmentId]
       );
       if (res.rowCount > 0) {
         assignmentMeta = res.rows[0];

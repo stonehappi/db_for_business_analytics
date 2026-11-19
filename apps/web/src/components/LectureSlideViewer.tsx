@@ -322,7 +322,7 @@ export default function LectureSlideViewer({
           >
             <div
               data-testid="active-slide-canvas"
-              className={`w-full max-w-4xl min-h-[420px] rounded-lg border p-6 sm:p-10 shadow-xs flex flex-col justify-between transition-all duration-150 ${
+              className={`w-full min-h-[420px] rounded-lg border p-6 sm:p-10 shadow-xs flex flex-col justify-between transition-all duration-150 ${
                 isFullscreen
                   ? 'bg-zinc-900 border-zinc-800 text-zinc-100 shadow-xl'
                   : 'bg-surface border-border text-ink'
@@ -353,7 +353,7 @@ export default function LectureSlideViewer({
           /* CONTINUOUS DOCUMENT MODE (All slides stacked) */
           <div
             data-testid="continuous-slide-doc"
-            className="flex-1 p-6 space-y-6 overflow-y-auto max-w-4xl mx-auto w-full"
+            className="flex-1 p-6 space-y-6 overflow-y-auto w-full"
           >
             {slides.map((s, idx) => (
               <div

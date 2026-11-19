@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { queryApp } from '@db-platform/db';
+import { queryApp, generate16WeeksForCourse } from '@db-platform/db';
 import { getSessionUser } from '@/lib/auth';
 
 export async function GET(req: NextRequest) {
@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { code, title, description } = body;
+    const { code, title, description, autoGenerateWeeks = true } = body;
 
     if (!code || !title) {
       return NextResponse.json(
@@ -98,7 +98,18 @@ export async function POST(req: NextRequest) {
       [cleanCode, cleanTitle, cleanDesc, user.id]
     );
 
-    return NextResponse.json(res.rows[0], { status: 201 });
+    const createdCourse = res.rows[0];
+
+    // Automatically generate 16 weeks of structured curriculum
+    if (autoGenerateWeeks) {
+      try {
+        await generate16WeeksForCourse(createdCourse.id, cleanCode);
+      } catch (genErr) {
+        console.error('Warning: Error auto-generating 16 weeks:', genErr);
+      }
+    }
+
+    return NextResponse.json(createdCourse, { status: 201 });
   } catch (err: any) {
     if (err.code === '23505') {
       return NextResponse.json(
@@ -106,6 +117,42 @@ export async function POST(req: NextRequest) {
         { status: 409 }
       );
     }
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const user = await getSessionUser(req);
+    if (!user || (user.role !== 'teacher' && user.role !== 'admin')) {
+      return NextResponse.json(
+        { error: 'Forbidden: Only teachers can delete master courses' },
+        { status: 403 }
+      );
+    }
+
+    const url = new URL(req.url);
+    const id = url.searchParams.get('id');
+
+    if (!id) {
+      return NextResponse.json({ error: 'Course id is required' }, { status: 400 });
+    }
+
+    const res = await queryApp(
+      `DELETE FROM master_courses WHERE id = $1 RETURNING id, code, title;`,
+      [id]
+    );
+
+    if (res.rowCount === 0) {
+      return NextResponse.json({ error: 'Course not found' }, { status: 404 });
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: `Course ${res.rows[0].code} successfully deleted`,
+      deletedCourse: res.rows[0],
+    });
+  } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }

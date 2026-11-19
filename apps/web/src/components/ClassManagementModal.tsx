@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Calendar, Plus, X, Check, Users, Lock, CheckCircle2 } from 'lucide-react';
+import { Calendar, Plus, X, Check, Users, Lock, CheckCircle2, Trash2 } from 'lucide-react';
 import { CohortClass } from './Navigation';
 
 interface ClassManagementModalProps {
@@ -12,6 +12,7 @@ interface ClassManagementModalProps {
   onSelectClass: (cohortId: string) => void;
   onOpenCreateClass: () => void;
   onOpenStudentManagement?: (cohortId?: string) => void;
+  onDeleteClass?: (cls: CohortClass) => void;
   courseTitle?: string;
 }
 
@@ -23,6 +24,7 @@ export default function ClassManagementModal({
   onSelectClass,
   onOpenCreateClass,
   onOpenStudentManagement,
+  onDeleteClass,
   courseTitle,
 }: ClassManagementModalProps) {
   if (!isOpen) return null;
@@ -122,7 +124,7 @@ export default function ClassManagementModal({
                     <td className="py-2.5 px-3 text-center font-mono">
                       {cls.student_count ?? 0}
                     </td>
-                    <td className="py-2.5 px-3 text-right space-x-1.5">
+                    <td className="py-2.5 px-3 text-right space-x-1 whitespace-nowrap">
                       {onOpenStudentManagement && (
                         <button
                           onClick={() => {
@@ -153,6 +155,16 @@ export default function ClassManagementModal({
                           Select
                         </button>
                       )}
+                      {onDeleteClass && (
+                        <button
+                          onClick={() => onDeleteClass(cls)}
+                          title={`Delete Class ${cls.code}`}
+                          data-testid={`btn-delete-class-${cls.id}`}
+                          className="p-1 text-ink-secondary hover:text-red-600 hover:bg-red-50 rounded transition-colors inline-flex items-center"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </td>
                   </tr>
                 );
@@ -163,7 +175,7 @@ export default function ClassManagementModal({
 
         {/* Footer */}
         <div className="flex items-center justify-between pt-2 border-t border-border text-xs text-ink-secondary">
-          <span>{classes.length} total Class Sections</span>
+          <span>{classes.length} total Class Sections defined</span>
           <button
             onClick={onClose}
             className="px-3 py-1.5 text-xs border border-border bg-white hover:bg-subtle text-ink rounded transition-colors"

@@ -108,3 +108,39 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const user = await getSessionUser(req);
+    if (!user || (user.role !== 'teacher' && user.role !== 'admin')) {
+      return NextResponse.json(
+        { error: 'Forbidden: Only teachers can delete classes' },
+        { status: 403 }
+      );
+    }
+
+    const url = new URL(req.url);
+    const id = url.searchParams.get('id');
+
+    if (!id) {
+      return NextResponse.json({ error: 'Class id is required' }, { status: 400 });
+    }
+
+    const res = await queryApp(
+      `DELETE FROM cohorts WHERE id = $1 RETURNING id, code, name;`,
+      [id]
+    );
+
+    if (res.rowCount === 0) {
+      return NextResponse.json({ error: 'Class not found' }, { status: 404 });
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: `Class ${res.rows[0].code} successfully deleted`,
+      deletedCohort: res.rows[0],
+    });
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
+}

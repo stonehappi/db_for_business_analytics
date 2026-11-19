@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { BookOpen, Plus, X, Check, Users, Layers, ExternalLink } from 'lucide-react';
+import { BookOpen, Plus, X, Check, Users, Layers, ExternalLink, Trash2, Sparkles } from 'lucide-react';
 import { Course } from './Navigation';
 
 interface CourseManagementModalProps {
@@ -12,6 +12,8 @@ interface CourseManagementModalProps {
   onSelectCourse: (courseId: string) => void;
   onOpenCreateCourse: () => void;
   onOpenCreateClass: () => void;
+  onDeleteCourse?: (course: Course) => void;
+  onOpenMcpModal?: () => void;
 }
 
 export default function CourseManagementModal({
@@ -22,6 +24,8 @@ export default function CourseManagementModal({
   onSelectCourse,
   onOpenCreateCourse,
   onOpenCreateClass,
+  onDeleteCourse,
+  onOpenMcpModal,
 }: CourseManagementModalProps) {
   if (!isOpen) return null;
 
@@ -46,6 +50,20 @@ export default function CourseManagementModal({
           </div>
 
           <div className="flex items-center space-x-2">
+            {onOpenMcpModal && (
+              <button
+                onClick={() => {
+                  onClose();
+                  onOpenMcpModal();
+                }}
+                className="px-2 py-1.5 text-xs bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded transition-colors flex items-center space-x-1 font-medium"
+                title="Configure AI & MCP Connection"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                <span>AI & MCP Key</span>
+              </button>
+            )}
+
             <button
               onClick={() => {
                 onClose();
@@ -104,12 +122,12 @@ export default function CourseManagementModal({
                       {c.module_count ?? 16}
                     </td>
                     <td className="py-2.5 px-3 text-center font-mono">
-                      {c.class_count ?? 1}
+                      {c.class_count ?? 0}
                     </td>
                     <td className="py-2.5 px-3 text-center font-mono">
                       {c.student_count ?? 0}
                     </td>
-                    <td className="py-2.5 px-3 text-right space-x-1">
+                    <td className="py-2.5 px-3 text-right space-x-1 whitespace-nowrap">
                       {isSelected ? (
                         <span className="inline-flex items-center space-x-1 text-[11px] font-medium text-status-success px-2 py-0.5 rounded bg-green-50 border border-green-200">
                           <Check className="w-3 h-3" />
@@ -124,6 +142,17 @@ export default function CourseManagementModal({
                           className="px-2 py-1 text-xs border border-border bg-subtle hover:bg-active text-ink rounded transition-colors"
                         >
                           Select
+                        </button>
+                      )}
+
+                      {onDeleteCourse && (
+                        <button
+                          onClick={() => onDeleteCourse(c)}
+                          title={`Delete Course ${c.code}`}
+                          data-testid={`btn-delete-course-${c.id}`}
+                          className="p-1 text-ink-secondary hover:text-red-600 hover:bg-red-50 rounded transition-colors inline-flex items-center"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       )}
                     </td>

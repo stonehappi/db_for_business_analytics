@@ -125,7 +125,7 @@ export default function GradingDrawer({
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-1.5 font-medium text-ink">
               <FileCode className="w-3.5 h-3.5" />
-              <span>Student Submitted {isPython ? 'Python' : 'SQL'}</span>
+              <span>{isPython ? 'Student Submitted Code (Python)' : 'Student Submitted SQL'}</span>
             </div>
           </div>
 

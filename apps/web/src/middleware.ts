@@ -10,10 +10,11 @@ const JWT_SECRET = new TextEncoder().encode(
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // Public paths that do not require authentication
+  // Public paths that do not require session cookie authentication
   if (
     pathname.startsWith('/_next') ||
     pathname.startsWith('/api/auth') ||
+    pathname.startsWith('/api/mcp') ||
     pathname === '/api/health' ||
     pathname === '/login' ||
     pathname === '/favicon.ico'

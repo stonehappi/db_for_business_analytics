@@ -25,15 +25,33 @@ export async function POST(req: NextRequest) {
     }
 
     // 1. Fetch assignment details (language, verifications, max_score)
-    const assignRes = await queryApp(
+    let effectiveCohortAssignmentId = cohortAssignmentId;
+    let assignRes = await queryApp(
       `
-      SELECT ma.language, ma.verification_sql, ma.verification_python, ma.max_score
+      SELECT ca.id AS cohort_assignment_id, ma.language, ma.verification_sql, ma.verification_python, ma.max_score
       FROM cohort_assignments ca
       JOIN master_assignments ma ON ca.master_assignment_id = ma.id
       WHERE ca.id = $1;
     `,
       [cohortAssignmentId]
     );
+
+    if (assignRes.rowCount === 0) {
+      assignRes = await queryApp(
+        `
+        SELECT ca.id AS cohort_assignment_id, ma.language, ma.verification_sql, ma.verification_python, ma.max_score
+        FROM master_assignments ma
+        JOIN cohort_assignments ca ON ca.master_assignment_id = ma.id
+        WHERE ma.id = $1
+        ORDER BY ca.created_at ASC
+        LIMIT 1;
+      `,
+        [cohortAssignmentId]
+      );
+      if (assignRes.rowCount > 0) {
+        effectiveCohortAssignmentId = assignRes.rows[0].cohort_assignment_id;
+      }
+    }
 
     if (assignRes.rowCount === 0) {
       return NextResponse.json({ error: 'Assignment not found' }, { status: 404 });
@@ -94,7 +112,7 @@ export async function POST(req: NextRequest) {
       FROM submissions
       WHERE cohort_assignment_id = $1 AND student_id = $2;
     `,
-      [cohortAssignmentId, effectiveStudentId]
+      [effectiveCohortAssignmentId, effectiveStudentId]
     );
     const nextVersion = verRes.rows[0].next_version;
 
@@ -109,7 +127,7 @@ export async function POST(req: NextRequest) {
       RETURNING *;
     `,
       [
-        cohortAssignmentId,
+        effectiveCohortAssignmentId,
         effectiveStudentId,
         nextVersion,
         submittedSql || null,

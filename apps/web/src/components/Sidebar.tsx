@@ -20,6 +20,7 @@ import {
   CheckCircle2,
   Lock,
   ChevronRight,
+  Sparkles,
 } from 'lucide-react';
 import { UserProfile, Course, CohortClass } from './Navigation';
 import { useDialog } from './Dialog';
@@ -52,6 +53,7 @@ interface SidebarProps {
   onOpenCourseManagement: () => void;
   onOpenClassManagement: () => void;
   onOpenStudentManagement?: () => void;
+  onOpenMcpModal?: () => void;
 }
 
 export default function Sidebar({
@@ -73,6 +75,7 @@ export default function Sidebar({
   onOpenCourseManagement,
   onOpenClassManagement,
   onOpenStudentManagement,
+  onOpenMcpModal,
 }: SidebarProps) {
   const isTeacherOrTa = currentUser.role === 'teacher' || currentUser.role === 'ta';
   const isStudent = currentUser.role === 'student';
@@ -489,6 +492,27 @@ export default function Sidebar({
                   </div>
                 )}
               </button>
+
+              {onOpenMcpModal && (
+                <button
+                  onClick={() => handleActionClick(onOpenMcpModal)}
+                  data-testid="btn-sidebar-mcp"
+                  title="AI Model Context Protocol (MCP) Connection & Key"
+                  className={`w-full flex items-center ${
+                    isOpen ? 'space-x-2 px-2.5 text-left' : 'justify-center px-0'
+                  } py-1.5 text-xs rounded transition-colors text-amber-800 hover:text-amber-950 hover:bg-amber-50`}
+                >
+                  <Sparkles className="w-4 h-4 shrink-0 text-amber-600" />
+                  {isOpen && (
+                    <div className="flex-1 flex items-center justify-between">
+                      <span className="font-medium">AI & MCP Key</span>
+                      <span className="text-[10px] font-mono px-1 py-0.2 bg-amber-100 text-amber-800 rounded border border-amber-300">
+                        MCP
+                      </span>
+                    </div>
+                  )}
+                </button>
+              )}
             </div>
           )}
         </nav>

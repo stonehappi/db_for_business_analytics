@@ -56,7 +56,7 @@ export default function StudentGradesView({
 
   return (
     <div className="h-[calc(100vh-3rem)] overflow-y-auto p-3 sm:p-6 bg-canvas font-sans select-none">
-      <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6">
+      <div className="w-full space-y-4 sm:space-y-6">
         {/* Student Profile & Summary Header */}
         <div className="bg-surface border border-border rounded-lg p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="space-y-1">

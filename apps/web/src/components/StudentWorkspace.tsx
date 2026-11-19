@@ -306,8 +306,9 @@ export default function StudentWorkspace({ currentUser, cohortId, courseId }: St
                   if (cohortMatch) {
                     setSelectedAssignment(cohortMatch);
                   } else if (modMatch) {
+                    const fallbackCohort = assignments.find((a) => a.master_assignment_id === modMatch.id || a.slug === modMatch.slug);
                     setSelectedAssignment({
-                      cohort_assignment_id: modMatch.id,
+                      cohort_assignment_id: fallbackCohort ? fallbackCohort.cohort_assignment_id : modMatch.id,
                       master_assignment_id: modMatch.id,
                       title: modMatch.title,
                       slug: modMatch.slug,
